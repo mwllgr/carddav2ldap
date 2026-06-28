@@ -211,6 +211,18 @@ class LDAPRequestHandler:
         if not req:
             return [_build_search_result_done(message_id, LDAP_OPERATIONS_ERROR)]
 
+        base = req["base_dn"].lower()
+        scope = req["scope"]  # 0=base, 1=oneLevel, 2=subtree
+
+        if scope == 0:
+            return [_build_search_result_done(message_id, LDAP_SUCCESS)]
+
+        if scope == 1 and base != self.base_dn:
+            return [_build_search_result_done(message_id, LDAP_SUCCESS)]
+
+        if scope == 2 and base != self.base_dn and not self.base_dn.endswith("," + base):
+            return [_build_search_result_done(message_id, LDAP_SUCCESS)]
+
         results: list[bytes] = []
         count = 0
         size_limit = req["size_limit"] if req["size_limit"] > 0 else 0
@@ -346,6 +358,13 @@ def create_ssl_context(
     ca_certfile: str | None = None,
     require_client_cert: bool = False,
 ) -> ssl.SSLContext:
+    import os
+    for path, label in [(certfile, "TLS certificate"), (keyfile, "TLS key")]:
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"{label} not found: {path}")
+    if ca_certfile and not os.path.isfile(ca_certfile):
+        raise FileNotFoundError(f"TLS CA certificate not found: {ca_certfile}")
+
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(certfile, keyfile)
     if require_client_cert:

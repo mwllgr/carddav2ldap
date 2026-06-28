@@ -285,6 +285,76 @@ class TestLDAPRequestHandler:
         responses = self.handler.handle_message(msg)
         assert responses == []
 
+    def test_search_base_scope_returns_nothing(self):
+        req = _build_search_request(12, base_dn="dc=contacts,dc=local", scope=0)
+        msg, _ = ber.read_ldap_message(req)
+        responses = self.handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 0
+
+    def test_search_one_level_at_base_returns_entries(self):
+        req = _build_search_request(13, base_dn="dc=contacts,dc=local", scope=1)
+        msg, _ = ber.read_ldap_message(req)
+        responses = self.handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 2
+
+    def test_search_one_level_at_entry_returns_nothing(self):
+        req = _build_search_request(14, base_dn="cn=John Doe,dc=contacts,dc=local", scope=1)
+        msg, _ = ber.read_ldap_message(req)
+        responses = self.handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 0
+
+    def test_search_subtree_at_base_returns_entries(self):
+        req = _build_search_request(15, base_dn="dc=contacts,dc=local", scope=2)
+        msg, _ = ber.read_ldap_message(req)
+        responses = self.handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 2
+
+    def test_search_subtree_at_entry_returns_nothing(self):
+        req = _build_search_request(16, base_dn="cn=John Doe,dc=contacts,dc=local", scope=2)
+        msg, _ = ber.read_ldap_message(req)
+        responses = self.handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 0
+
+    def test_search_subtree_from_parent_returns_entries(self):
+        req = _build_search_request(17, base_dn="dc=local", scope=2)
+        msg, _ = ber.read_ldap_message(req)
+        responses = self.handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 2
+
+    def test_search_unrelated_base_returns_nothing(self):
+        req = _build_search_request(18, base_dn="dc=other,dc=com", scope=2)
+        msg, _ = ber.read_ldap_message(req)
+        responses = self.handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 0
+
     def test_update_entries(self):
         self.handler.update_entries([SAMPLE_ENTRIES[0]])
         req = _build_search_request(11)
