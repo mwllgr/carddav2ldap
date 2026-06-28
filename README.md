@@ -5,14 +5,16 @@ Bridge that fetches contacts from a CardDAV server and serves them over LDAP. Us
 ## Features
 
 - Connects to any CardDAV server (Nextcloud, Radicale, Baikal, etc.)
-- Serves contacts via a built-in LDAP server
+- Serves contacts via a built-in read-only LDAP server
+- HTTP/2 by default, optional HTTP/3 (QUIC) support
 - HTTPS with custom CA certificates for CardDAV
 - LDAPS (TLS) for the LDAP server
-- Mutual TLS (mTLS) on both CardDAV and LDAP sides
-- Client certificate CN whitelisting
+- Mutual TLS (mTLS) on both CardDAV and LDAP sides with CN whitelisting
 - Configurable vCard-to-LDAP attribute mapping
-- Periodic background refresh of contacts
+- Cached mode with periodic background refresh, or real-time mode with CardDAV server-side filtering per LDAP search
+- Optional LDAP client IP forwarding in the User-Agent for real-time searches
 - Configuration via YAML file, environment variables, or both
+- Docker-ready with rootless container and configurable UID
 
 ## Installation
 
@@ -105,6 +107,7 @@ All settings can be provided via a YAML config file, environment variables, or b
 | `carddav.refresh_interval` | `CARDDAV_REFRESH_INTERVAL` | `300` | Seconds between contact re-fetches |
 | `carddav.realtime` | `CARDDAV_REALTIME` | `false` | Fetch from CardDAV on each LDAP search (see below) |
 | `carddav.http3` | `CARDDAV_HTTP3` | `false` | Enable HTTP/3 (QUIC) for CardDAV connections (see below) |
+| `carddav.forward_client_ip` | `CARDDAV_FORWARD_CLIENT_IP` | `false` | Append LDAP client IP:port to User-Agent in real-time mode |
 
 ### LDAP server settings
 
@@ -177,6 +180,24 @@ export CARDDAV_REALTIME=true
 Real-time mode is useful when the address book changes frequently and you want instant visibility, or when the address book is very large and you prefer not to cache it. The trade-off is higher latency per search (a CardDAV round-trip) and more load on the CardDAV server.
 
 When real-time mode is enabled, `refresh_interval` is ignored.
+
+### Client IP forwarding
+
+In real-time mode, you can optionally include the LDAP client's IP address and source port in the `User-Agent` header sent to the CardDAV server. This can be useful for debugging or access logging on the CardDAV side.
+
+```yaml
+carddav:
+  realtime: true
+  forward_client_ip: true
+```
+
+This produces a User-Agent like:
+
+```
+carddav-to-ldap.mwllgr.at/0.4.0 @ 192.168.1.4:82842
+```
+
+Disabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent.
 
 ## HTTP/3
 

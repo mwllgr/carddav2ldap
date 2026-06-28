@@ -367,7 +367,7 @@ class TestLDAPRequestHandler:
         assert len(entries) == 0
 
     def test_search_fn_callback(self):
-        def fake_search(terms):
+        def fake_search(terms, peer=None):
             return [SAMPLE_ENTRIES[0]]
 
         handler = LDAPRequestHandler(
@@ -387,7 +387,7 @@ class TestLDAPRequestHandler:
     def test_search_fn_receives_terms(self):
         received_terms = []
 
-        def capture_search(terms):
+        def capture_search(terms, peer=None):
             received_terms.extend(terms)
             return SAMPLE_ENTRIES
 
@@ -406,7 +406,7 @@ class TestLDAPRequestHandler:
         assert ("cn", "John") in received_terms
 
     def test_search_fn_error_returns_error(self):
-        def failing_search(terms):
+        def failing_search(terms, peer=None):
             raise ConnectionError("CardDAV down")
 
         handler = LDAPRequestHandler(

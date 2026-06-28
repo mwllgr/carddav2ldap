@@ -37,8 +37,8 @@ async def _refresh_loop(cfg: Config, handler: LDAPRequestHandler) -> None:
 
 
 def _make_search_fn(cfg: Config):
-    def search_fn(terms: list[tuple[str, str]]) -> list[dict]:
-        vcards = search_contacts(cfg.carddav, terms)
+    def search_fn(terms: list[tuple[str, str]], peer: tuple | None = None) -> list[dict]:
+        vcards = search_contacts(cfg.carddav, terms, peer)
         entries = []
         for vcard in vcards:
             entry = vcard_to_ldap_entry(vcard, cfg.attribute_mapping, cfg.ldap.base_dn)

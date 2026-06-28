@@ -218,17 +218,31 @@ def build_carddav_filter(terms: list[tuple[str, str]]) -> str:
     return f'<c:filter test="anyof">{"".join(prop_filters)}</c:filter>'
 
 
-def search_contacts(cfg: CardDAVConfig, terms: list[tuple[str, str]]) -> list[vobject.base.Component]:
+def _user_agent_for_peer(peer: tuple | None) -> str:
+    if peer and len(peer) >= 2:
+        return f"{USER_AGENT} @ {peer[0]}:{peer[1]}"
+    return USER_AGENT
+
+
+def search_contacts(
+    cfg: CardDAVConfig,
+    terms: list[tuple[str, str]],
+    peer: tuple | None = None,
+) -> list[vobject.base.Component]:
     client = _build_client(cfg)
     carddav_filter = build_carddav_filter(terms)
     body = ADDRESSBOOK_QUERY_BODY.format(filter=carddav_filter)
 
     logger.debug("CardDAV addressbook-query with %d filter terms", len(terms))
 
-    resp = client.request("REPORT", cfg.url, content=body, headers={
+    headers: dict[str, str] = {
         "Content-Type": "application/xml; charset=utf-8",
         "Depth": "1",
-    })
+    }
+    if cfg.forward_client_ip and peer:
+        headers["User-Agent"] = _user_agent_for_peer(peer)
+
+    resp = client.request("REPORT", cfg.url, content=body, headers=headers)
     resp.raise_for_status()
 
     root = ET.fromstring(resp.text)

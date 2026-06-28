@@ -203,7 +203,7 @@ class LDAPRequestHandler:
         base_dn: str,
         bind_dn: str = "",
         bind_password: str = "",
-        search_fn: Callable[[list[tuple[str, str]]], list[dict[str, Any]]] | None = None,
+        search_fn: Callable[[list[tuple[str, str]], tuple | None], list[dict[str, Any]]] | None = None,
     ):
         self.entries = entries
         self.base_dn = base_dn.lower()
@@ -211,7 +211,7 @@ class LDAPRequestHandler:
         self.bind_password = bind_password
         self.search_fn = search_fn
 
-    def handle_message(self, msg: BERElement) -> list[bytes]:
+    def handle_message(self, msg: BERElement, peer: tuple | None = None) -> list[bytes]:
         children = msg.value if isinstance(msg.value, list) else []
         if len(children) < 2:
             return []
@@ -223,7 +223,7 @@ class LDAPRequestHandler:
             if op.tag_number == 0:  # BindRequest
                 return self._handle_bind(message_id, op)
             if op.tag_number == 3:  # SearchRequest
-                return self._handle_search(message_id, op)
+                return self._handle_search(message_id, op, peer)
             if op.tag_number == 2:  # UnbindRequest
                 return []
 
@@ -245,7 +245,7 @@ class LDAPRequestHandler:
 
         return [_build_bind_response(message_id, LDAP_SUCCESS)]
 
-    def _handle_search(self, message_id: int, op: BERElement) -> list[bytes]:
+    def _handle_search(self, message_id: int, op: BERElement, peer: tuple | None = None) -> list[bytes]:
         req = _parse_search_request(op)
         if not req:
             return [_build_search_result_done(message_id, LDAP_OPERATIONS_ERROR)]
@@ -256,7 +256,7 @@ class LDAPRequestHandler:
         if self.search_fn is not None:
             try:
                 terms = extract_filter_terms(req["filter"])
-                search_entries = self.search_fn(terms)
+                search_entries = self.search_fn(terms, peer)
             except Exception:
                 logger.exception("Real-time search failed")
                 return [_build_search_result_done(message_id, LDAP_OPERATIONS_ERROR, "Backend search failed")]
@@ -357,7 +357,7 @@ class LDAPServer:
                     if msg is None:
                         break
 
-                    responses = self.handler.handle_message(msg)
+                    responses = self.handler.handle_message(msg, peer)
                     if not responses:
                         writer.close()
                         await writer.wait_closed()

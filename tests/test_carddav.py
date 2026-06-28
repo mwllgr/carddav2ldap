@@ -7,7 +7,7 @@ import pytest
 
 from carddav_to_ldap.carddav import (
     _build_client, _discover_vcards, _fetch_vcards, fetch_contacts,
-    build_carddav_filter, search_contacts,
+    build_carddav_filter, search_contacts, _user_agent_for_peer, USER_AGENT,
 )
 from carddav_to_ldap.config import CardDAVConfig
 
@@ -266,3 +266,47 @@ class TestSearchContacts:
         call_args = mock_client.request.call_args
         body = call_args[1].get("content") or call_args[0][2]
         assert "prop-filter" not in body
+
+    @patch("carddav_to_ldap.carddav._build_client")
+    def test_search_forwards_client_ip(self, mock_build):
+        mock_client = MagicMock()
+        mock_build.return_value = mock_client
+        mock_response = MagicMock()
+        mock_response.text = REPORT_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_client.request.return_value = mock_response
+
+        cfg = CardDAVConfig(url="https://dav.example.com/contacts/", forward_client_ip=True)
+        search_contacts(cfg, [("cn", "John")], peer=("192.168.1.4", 82842))
+
+        call_args = mock_client.request.call_args
+        headers = call_args[1].get("headers", {})
+        assert headers["User-Agent"] == f"{USER_AGENT} @ 192.168.1.4:82842"
+
+    @patch("carddav_to_ldap.carddav._build_client")
+    def test_search_no_forward_without_config(self, mock_build):
+        mock_client = MagicMock()
+        mock_build.return_value = mock_client
+        mock_response = MagicMock()
+        mock_response.text = REPORT_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_client.request.return_value = mock_response
+
+        cfg = CardDAVConfig(url="https://dav.example.com/contacts/", forward_client_ip=False)
+        search_contacts(cfg, [("cn", "John")], peer=("192.168.1.4", 82842))
+
+        call_args = mock_client.request.call_args
+        headers = call_args[1].get("headers", {})
+        assert "User-Agent" not in headers
+
+
+class TestUserAgentForPeer:
+    def test_with_peer(self):
+        assert _user_agent_for_peer(("192.168.1.4", 82842)) == f"{USER_AGENT} @ 192.168.1.4:82842"
+
+    def test_with_none(self):
+        assert _user_agent_for_peer(None) == USER_AGENT
+
+    def test_with_empty_tuple(self):
+        assert _user_agent_for_peer(()) == USER_AGENT
+

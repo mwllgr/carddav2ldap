@@ -37,6 +37,7 @@ class CardDAVConfig:
     refresh_interval: int = 300
     realtime: bool = False
     http3: bool = False
+    forward_client_ip: bool = False
 
     @classmethod
     def from_dict(cls, d: dict) -> CardDAVConfig:

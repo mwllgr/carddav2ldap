@@ -25,6 +25,11 @@ carddav:
   # Requires: pip install carddav-to-ldap[http3]
   # http3: false
 
+  # In real-time mode, append the LDAP client's IP:port to the
+  # User-Agent header sent to the CardDAV server.
+  # Example: carddav-to-ldap.mwllgr.at/0.4.0 @ 192.168.1.4:82842
+  # forward_client_ip: false
+
 ldap:
   host: 0.0.0.0
   # port: auto-detected (389 for LDAP, 636 for LDAPS) — override to set explicitly
