@@ -2,6 +2,8 @@
 
 Bridge that fetches contacts from a CardDAV server and serves them over LDAP. Useful for IP phones and other devices that support LDAP phonebook lookup but not CardDAV.
 
+> **Disclaimer:** This project was developed extensively with the help of AI (Claude). The code has not undergone a thorough security review. Use at your own risk, especially in production or security-sensitive environments.
+
 ## Features
 
 - Connects to any CardDAV server (Nextcloud, Radicale, Baikal, etc.)

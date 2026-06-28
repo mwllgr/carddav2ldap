@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "carddav2ldap"
 dynamic = ["version"]
 description = "Bridge CardDAV contacts to an LDAP server for IP phones and other LDAP-only clients"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "httpx[http2]>=0.27",
