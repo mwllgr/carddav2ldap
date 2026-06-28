@@ -392,8 +392,10 @@ carddav:
 
 Successfully tested with the following devices:
 
-- Grandstream WP826
-- Snom D785
+- [Grandstream WP826](DEVICES.md#grandstream-wp826)
+- [Snom D785](DEVICES.md#snom-d785)
+
+See [DEVICES.md](DEVICES.md) for configuration screenshots and setup instructions.
 
 ## Development
 
