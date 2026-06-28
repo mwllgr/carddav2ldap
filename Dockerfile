@@ -2,7 +2,7 @@ FROM python:3.13-alpine
 
 WORKDIR /app
 
-COPY pyproject.toml .
+COPY pyproject.toml VERSION.txt ./
 COPY src/ src/
 
 RUN apk add --no-cache su-exec && pip install --no-cache-dir .
