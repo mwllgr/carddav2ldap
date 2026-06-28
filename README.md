@@ -168,6 +168,7 @@ The `attribute_mapping` section maps LDAP attribute names to vCard property path
 
 | Path | Meaning |
 |---|---|
+| `uid` | Unique identifier (UID property) |
 | `fn` | Full name (FN property) |
 | `n.family` | Family name from N property |
 | `n.given` | Given name from N property |
@@ -189,8 +190,32 @@ The `attribute_mapping` section maps LDAP attribute names to vCard property path
 | `adr.region` | State/region |
 | `adr.code` | Postal code |
 | `adr.country` | Country |
+| `rev` | Last-modified timestamp (REV property) |
+| `prodid` | Application that created the vCard (PRODID property) |
+| `bday` | Birthday (BDAY property) |
+| `photo` | Contact photo (PHOTO property, base64-encoded if binary) |
 
 The default mapping produces standard `inetOrgPerson` entries. Contacts with multiple phone numbers will have all numbers included in the `telephoneNumber` attribute.
+
+### Custom-labeled properties (X-ABLABEL)
+
+Some CardDAV clients (Android, iOS) use vCard grouping with `X-ABLABEL` to attach custom labels to phone numbers, email addresses, and postal addresses:
+
+```
+ITEM1.X-ABLABEL:Vacation Home
+ITEM1.TEL:+43 677 62951924
+```
+
+These grouped values are automatically included in the collective attribute (e.g. `telephoneNumber`) and additionally mapped to a custom attribute based on the label in PascalCase:
+
+| Property | Label | Custom attribute |
+|---|---|---|
+| TEL | Mobile | `customTelephoneMobile` |
+| TEL | Work Mobile | `customTelephoneWorkMobile` |
+| EMAIL | Office | `customEmailOffice` |
+| ADR | Vacation Home | `customAddressVacationHome` |
+
+This requires no configuration — it works automatically for all TEL, EMAIL, and ADR properties that have an `X-ABLABEL` group.
 
 Attribute mapping is only configurable via the YAML config file, not via environment variables.
 

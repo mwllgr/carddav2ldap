@@ -51,6 +51,7 @@ accounts:
 # Each LDAP attribute maps to a list of vCard property paths.
 # Paths use dot notation: "tel.cell" = TEL with TYPE=CELL.
 attribute_mapping:
+  uid: [uid]
   cn: [fn]
   sn: [n.family]
   givenName: [n.given]
@@ -72,3 +73,7 @@ attribute_mapping:
   st: [adr.region]
   postalCode: [adr.code]
   c: [adr.country]
+  rev: [rev]
+  createdByApplication: [prodid]
+  birthday: [bday]
+  jpegPhoto: [photo]

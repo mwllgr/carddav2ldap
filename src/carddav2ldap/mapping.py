@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import logging
 from typing import Any
 
@@ -20,7 +21,9 @@ def _get_vcard_value(vcard: vobject.base.Component, path: str) -> list[str]:
         values: list[str] = []
         for child in matching:
             val = child.value
-            if isinstance(val, str) and val.strip():
+            if isinstance(val, bytes):
+                values.append(base64.b64encode(val).decode("ascii"))
+            elif isinstance(val, str) and val.strip():
                 values.append(val.strip())
             elif isinstance(val, list):
                 values.extend(v.strip() for v in val if isinstance(v, str) and v.strip())
@@ -108,7 +111,67 @@ def vcard_to_ldap_entry(
     if "sn" not in attrs:
         attrs["sn"] = [cn.split()[-1] if " " in cn else cn]
 
+    _apply_labeled_groups(vcard, attrs)
+
     return {"dn": dn, "attributes": attrs}
+
+
+_LABELED_PROP_PREFIXES = {
+    "TEL": "customTelephone",
+    "EMAIL": "customEmail",
+    "ADR": "customAddress",
+}
+
+
+def _to_pascal_case(label: str) -> str:
+    import re
+    words = re.split(r'[^a-zA-Z0-9]+', label)
+    return "".join(w.capitalize() for w in words if w)
+
+
+def _format_adr(adr: object) -> str:
+    parts = []
+    for attr in ("street", "city", "region", "code", "country"):
+        val = getattr(adr, attr, "")
+        if isinstance(val, str) and val.strip():
+            parts.append(val.strip())
+    return ", ".join(parts)
+
+
+def _apply_labeled_groups(vcard: vobject.base.Component, attrs: dict[str, list[str]]) -> None:
+    children = list(vcard.getChildren())
+
+    labels: dict[str, str] = {}
+    for c in children:
+        if c.group and c.name.upper() == "X-ABLABEL":
+            val = c.value if isinstance(c.value, str) else ""
+            if val.strip():
+                labels[c.group.upper()] = val.strip()
+
+    for c in children:
+        if not c.group:
+            continue
+        group_key = c.group.upper()
+        label = labels.get(group_key)
+        if not label:
+            continue
+        prop = c.name.upper()
+        prefix = _LABELED_PROP_PREFIXES.get(prop)
+        if not prefix:
+            continue
+
+        pascal_label = _to_pascal_case(label)
+        attr_name = f"{prefix}{pascal_label}"
+
+        if prop == "ADR":
+            val = _format_adr(c.value)
+        elif isinstance(c.value, str):
+            val = c.value.strip()
+        else:
+            val = str(c.value).strip()
+
+        if val:
+            attrs.setdefault(attr_name, []).append(val)
 
 
 def _escape_dn_value(val: str) -> str:

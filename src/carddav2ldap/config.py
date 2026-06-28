@@ -103,6 +103,7 @@ def _unwrap_optional(type_hint: object) -> type:
 
 
 DEFAULT_ATTRIBUTE_MAPPING = {
+    "uid": ["uid"],
     "cn": ["fn"],
     "sn": ["n.family"],
     "givenName": ["n.given"],
@@ -124,6 +125,10 @@ DEFAULT_ATTRIBUTE_MAPPING = {
     "st": ["adr.region"],
     "postalCode": ["adr.code"],
     "c": ["adr.country"],
+    "rev": ["rev"],
+    "createdByApplication": ["prodid"],
+    "birthday": ["bday"],
+    "jpegPhoto": ["photo"],
 }
 
 

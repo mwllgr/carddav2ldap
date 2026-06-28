@@ -14,6 +14,8 @@ def sample_vcard_text():
     return """\
 BEGIN:VCARD
 VERSION:3.0
+PRODID:+//IDN bitfire.at//DAVx5/4.2.6-ose ez-vcard/0.11.3
+UID:42fd302c-d119-476c-b19e-18b8f60d18f1
 FN:John Doe
 N:Doe;John;;;
 TEL;TYPE=WORK:+1-555-0100
@@ -24,6 +26,8 @@ EMAIL;TYPE=HOME:john.doe@home.example.com
 ORG:Acme Inc.
 TITLE:Engineer
 ADR;TYPE=WORK:;;123 Main St;Springfield;IL;62701;US
+REV:20230108T130105Z
+BDAY:20031220
 END:VCARD"""
 
 

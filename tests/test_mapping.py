@@ -3,7 +3,7 @@ from __future__ import annotations
 import vobject
 
 from carddav2ldap.config import DEFAULT_ATTRIBUTE_MAPPING
-from carddav2ldap.mapping import vcard_to_ldap_entry, _get_vcard_value, _escape_dn_value
+from carddav2ldap.mapping import vcard_to_ldap_entry, _get_vcard_value, _escape_dn_value, _to_pascal_case
 
 
 class TestGetVcardValue:
@@ -18,6 +18,36 @@ class TestGetVcardValue:
     def test_n_given(self, sample_vcard_text):
         vcard = vobject.readOne(sample_vcard_text)
         assert _get_vcard_value(vcard, "n.given") == ["John"]
+
+    def test_uid(self, sample_vcard_text):
+        vcard = vobject.readOne(sample_vcard_text)
+        assert _get_vcard_value(vcard, "uid") == ["42fd302c-d119-476c-b19e-18b8f60d18f1"]
+
+    def test_prodid(self, sample_vcard_text):
+        vcard = vobject.readOne(sample_vcard_text)
+        assert _get_vcard_value(vcard, "prodid") == ["+//IDN bitfire.at//DAVx5/4.2.6-ose ez-vcard/0.11.3"]
+
+    def test_rev(self, sample_vcard_text):
+        vcard = vobject.readOne(sample_vcard_text)
+        assert _get_vcard_value(vcard, "rev") == ["20230108T130105Z"]
+
+    def test_bday(self, sample_vcard_text):
+        vcard = vobject.readOne(sample_vcard_text)
+        assert _get_vcard_value(vcard, "bday") == ["20031220"]
+
+    def test_photo_binary(self):
+        vcard_text = (
+            "BEGIN:VCARD\r\n"
+            "VERSION:3.0\r\n"
+            "FN:Photo Person\r\n"
+            "PHOTO;ENCODING=b;TYPE=JPEG:AQID\r\n"
+            "END:VCARD"
+        )
+        vcard = vobject.readOne(vcard_text)
+        vals = _get_vcard_value(vcard, "photo")
+        assert len(vals) == 1
+        import base64
+        assert base64.b64decode(vals[0]) == b"\x01\x02\x03"
 
     def test_email(self, sample_vcard_text):
         vcard = vobject.readOne(sample_vcard_text)
@@ -141,6 +171,116 @@ END:VCARD"""
         assert entry is not None
         assert entry["attributes"]["displayName"] == ["John Doe"]
         assert entry["attributes"]["phone"] == ["+1-555-0101"]
+
+    def test_labeled_telephone(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Labeled Person
+ITEM1.X-ABLABEL:Mobile
+ITEM1.TEL:+43 677 62951924
+TEL;TYPE=HOME:+1-555-0100
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        attrs = entry["attributes"]
+        assert "+43 677 62951924" in attrs["telephoneNumber"]
+        assert "+1-555-0100" in attrs["telephoneNumber"]
+        assert attrs["customTelephoneMobile"] == ["+43 677 62951924"]
+
+    def test_labeled_email(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Labeled Person
+ITEM1.X-ABLABEL:Office
+ITEM1.EMAIL:office@example.com
+EMAIL;TYPE=HOME:home@example.com
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        attrs = entry["attributes"]
+        assert "office@example.com" in attrs["mail"]
+        assert "home@example.com" in attrs["mail"]
+        assert attrs["customEmailOffice"] == ["office@example.com"]
+
+    def test_labeled_address(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Labeled Person
+ITEM1.X-ABLABEL:Vacation Home
+ITEM1.ADR:;;42 Beach Rd;Miami;FL;33101;US
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        attrs = entry["attributes"]
+        assert attrs["customAddressVacationHome"] == ["42 Beach Rd, Miami, FL, 33101, US"]
+
+    def test_labeled_multi_word_pascal_case(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Labeled Person
+ITEM1.X-ABLABEL:work mobile
+ITEM1.TEL:+1-555-9999
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["customTelephoneWorkMobile"] == ["+1-555-9999"]
+
+    def test_labeled_special_chars_sanitized(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Labeled Person
+ITEM1.X-ABLABEL:My Phone #1!
+ITEM1.TEL:+1-555-8888
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["customTelephoneMyPhone1"] == ["+1-555-8888"]
+
+    def test_multiple_labeled_groups(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Multi Label
+ITEM1.X-ABLABEL:Cabin
+ITEM1.TEL:+1-111-0001
+ITEM2.X-ABLABEL:Boat
+ITEM2.TEL:+1-111-0002
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        attrs = entry["attributes"]
+        assert attrs["customTelephoneCabin"] == ["+1-111-0001"]
+        assert attrs["customTelephoneBoat"] == ["+1-111-0002"]
+        assert "+1-111-0001" in attrs["telephoneNumber"]
+        assert "+1-111-0002" in attrs["telephoneNumber"]
+
+
+class TestToPascalCase:
+    def test_single_word(self):
+        assert _to_pascal_case("mobile") == "Mobile"
+
+    def test_multi_word(self):
+        assert _to_pascal_case("work mobile") == "WorkMobile"
+
+    def test_special_chars(self):
+        assert _to_pascal_case("my phone #1!") == "MyPhone1"
+
+    def test_already_capitalized(self):
+        assert _to_pascal_case("Office") == "Office"
+
+    def test_mixed_separators(self):
+        assert _to_pascal_case("home-office_phone") == "HomeOfficePhone"
 
 
 class TestEscapeDnValue:
