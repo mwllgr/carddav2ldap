@@ -283,7 +283,7 @@ class TestSearchContacts:
 
         call_args = mock_client.request.call_args
         headers = call_args[1].get("headers", {})
-        assert headers["User-Agent"] == f"{USER_AGENT} @ cn=user1 192.168.1.4:82842"
+        assert headers["User-Agent"] == f"{USER_AGENT} (192.168.1.4:82842 - cn=user1)"
 
     @patch("carddav_to_ldap.carddav._build_client")
     def test_search_no_forward_without_config(self, mock_build):
@@ -306,15 +306,15 @@ class TestSearchContacts:
 class TestUserAgentForRequester:
     def test_with_peer_and_bind_dn(self):
         r = RequesterInfo(peer=("192.168.1.4", 82842), bind_dn="cn=user1")
-        assert _user_agent_for_requester(r) == f"{USER_AGENT} @ cn=user1 192.168.1.4:82842"
+        assert _user_agent_for_requester(r) == f"{USER_AGENT} (192.168.1.4:82842 - cn=user1)"
 
     def test_with_peer_only(self):
         r = RequesterInfo(peer=("192.168.1.4", 82842))
-        assert _user_agent_for_requester(r) == f"{USER_AGENT} @ 192.168.1.4:82842"
+        assert _user_agent_for_requester(r) == f"{USER_AGENT} (192.168.1.4:82842)"
 
     def test_with_bind_dn_only(self):
         r = RequesterInfo(bind_dn="cn=user1")
-        assert _user_agent_for_requester(r) == f"{USER_AGENT} @ cn=user1"
+        assert _user_agent_for_requester(r) == f"{USER_AGENT} (cn=user1)"
 
     def test_with_none(self):
         assert _user_agent_for_requester(None) == USER_AGENT

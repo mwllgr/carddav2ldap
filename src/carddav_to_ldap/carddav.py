@@ -221,16 +221,16 @@ def build_carddav_filter(terms: list[tuple[str, str]]) -> str:
 def _user_agent_for_requester(requester: object | None) -> str:
     if requester is None:
         return USER_AGENT
-    parts = [USER_AGENT, "@"]
-    bind_dn = getattr(requester, "bind_dn", "")
-    if bind_dn:
-        parts.append(bind_dn)
+    info: list[str] = []
     peer = getattr(requester, "peer", None)
     if peer and len(peer) >= 2:
-        parts.append(f"{peer[0]}:{peer[1]}")
-    if len(parts) == 2:
+        info.append(f"{peer[0]}:{peer[1]}")
+    bind_dn = getattr(requester, "bind_dn", "")
+    if bind_dn:
+        info.append(bind_dn)
+    if not info:
         return USER_AGENT
-    return " ".join(parts)
+    return f"{USER_AGENT} ({' - '.join(info)})"
 
 
 def search_contacts(

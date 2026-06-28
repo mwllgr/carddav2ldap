@@ -283,7 +283,7 @@ carddav:
 This produces a User-Agent like:
 
 ```
-carddav-to-ldap.mwllgr.at/0.4.0 @ cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at 192.168.1.4:82842
+carddav-to-ldap.mwllgr.at/0.4.0 (192.168.1.4:82842 - cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at)
 ```
 
 Enabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent. Set `forward_requester: false` to disable.
