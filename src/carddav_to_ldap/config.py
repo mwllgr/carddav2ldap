@@ -37,12 +37,13 @@ class CardDAVConfig:
     refresh_interval: int = 300
     realtime: bool = False
     http3: bool = False
-    forward_client_ip: bool = True
+    forward_requester: bool = True
 
     @classmethod
-    def from_dict(cls, d: dict) -> CardDAVConfig:
+    def from_dict(cls, d: dict, apply_env: bool = True) -> CardDAVConfig:
         inst = cls(**{k: v for k, v in d.items() if k in {f.name for f in dataclasses.fields(cls)}})
-        inst._apply_env()
+        if apply_env:
+            inst._apply_env()
         return inst
 
     def _apply_env(self) -> None:
@@ -124,17 +125,46 @@ DEFAULT_ATTRIBUTE_MAPPING = {
 
 
 @dataclasses.dataclass
+class Account:
+    bind_dn: str = ""
+    bind_password: str = ""
+    carddav: CardDAVConfig = dataclasses.field(default_factory=CardDAVConfig)
+
+    @classmethod
+    def from_dict(cls, d: dict, carddav_defaults: CardDAVConfig) -> Account:
+        default_dict = {f.name: getattr(carddav_defaults, f.name) for f in dataclasses.fields(CardDAVConfig)}
+        merged = {**default_dict, **d.get("carddav", {})}
+        carddav = CardDAVConfig.from_dict(merged, apply_env=False)
+        return cls(
+            bind_dn=d.get("bind_dn", ""),
+            bind_password=d.get("bind_password", ""),
+            carddav=carddav,
+        )
+
+
+@dataclasses.dataclass
 class Config:
     carddav: CardDAVConfig
     ldap: LDAPServerConfig
     attribute_mapping: dict[str, list[str]]
+    accounts: list[Account]
 
     @classmethod
     def from_dict(cls, d: dict) -> Config:
         carddav = CardDAVConfig.from_dict(d.get("carddav", {}))
         ldap = LDAPServerConfig.from_dict(d.get("ldap", {}))
         mapping = d.get("attribute_mapping", DEFAULT_ATTRIBUTE_MAPPING)
-        return cls(carddav=carddav, ldap=ldap, attribute_mapping=mapping)
+
+        if "accounts" in d:
+            accounts = [Account.from_dict(a, carddav) for a in d["accounts"]]
+        else:
+            accounts = [Account(
+                bind_dn=ldap.bind_dn,
+                bind_password=ldap.bind_password,
+                carddav=carddav,
+            )]
+
+        return cls(carddav=carddav, ldap=ldap, attribute_mapping=mapping, accounts=accounts)
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> Config:

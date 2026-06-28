@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from carddav_to_ldap.config import CardDAVConfig, Config, LDAPServerConfig, DEFAULT_ATTRIBUTE_MAPPING
+from carddav_to_ldap.config import Account, CardDAVConfig, Config, LDAPServerConfig, DEFAULT_ATTRIBUTE_MAPPING
 
 
 class TestCardDAVConfig:
@@ -187,3 +187,61 @@ class TestConfig:
         cfg = Config.from_yaml(config_file)
         assert cfg.carddav.url == "https://dav.example.com/"
         assert cfg.carddav.username == "env_user"
+
+    def test_single_user_creates_implicit_account(self):
+        cfg = Config.from_dict({
+            "carddav": {"url": "https://x.com/"},
+            "ldap": {"bind_dn": "cn=admin", "bind_password": "secret"},
+        })
+        assert len(cfg.accounts) == 1
+        assert cfg.accounts[0].bind_dn == "cn=admin"
+        assert cfg.accounts[0].bind_password == "secret"
+        assert cfg.accounts[0].carddav.url == "https://x.com/"
+
+    def test_multi_user_accounts(self):
+        cfg = Config.from_dict({
+            "carddav": {"verify_ssl": False, "refresh_interval": 120},
+            "accounts": [
+                {
+                    "bind_dn": "cn=user1",
+                    "bind_password": "pass1",
+                    "carddav": {"url": "https://dav1.example.com/"},
+                },
+                {
+                    "bind_dn": "cn=user2",
+                    "bind_password": "pass2",
+                    "carddav": {"url": "https://dav2.example.com/", "username": "u2"},
+                },
+            ],
+        })
+        assert len(cfg.accounts) == 2
+        assert cfg.accounts[0].bind_dn == "cn=user1"
+        assert cfg.accounts[0].carddav.url == "https://dav1.example.com/"
+        assert cfg.accounts[0].carddav.verify_ssl is False
+        assert cfg.accounts[0].carddav.refresh_interval == 120
+        assert cfg.accounts[1].carddav.url == "https://dav2.example.com/"
+        assert cfg.accounts[1].carddav.username == "u2"
+        assert cfg.accounts[1].carddav.verify_ssl is False
+
+    def test_accounts_inherit_carddav_defaults(self):
+        cfg = Config.from_dict({
+            "carddav": {"ca_cert": "/shared/ca.crt", "http3": True},
+            "accounts": [
+                {"bind_dn": "cn=u1", "bind_password": "p1", "carddav": {"url": "https://a.com/"}},
+            ],
+        })
+        assert cfg.accounts[0].carddav.ca_cert == "/shared/ca.crt"
+        assert cfg.accounts[0].carddav.http3 is True
+
+    def test_account_overrides_defaults(self):
+        cfg = Config.from_dict({
+            "carddav": {"verify_ssl": True, "refresh_interval": 300},
+            "accounts": [
+                {
+                    "bind_dn": "cn=u1", "bind_password": "p1",
+                    "carddav": {"url": "https://a.com/", "verify_ssl": False, "refresh_interval": 60},
+                },
+            ],
+        })
+        assert cfg.accounts[0].carddav.verify_ssl is False
+        assert cfg.accounts[0].carddav.refresh_interval == 60

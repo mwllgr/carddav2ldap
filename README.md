@@ -11,8 +11,9 @@ Bridge that fetches contacts from a CardDAV server and serves them over LDAP. Us
 - LDAPS (TLS) for the LDAP server
 - Mutual TLS (mTLS) on both CardDAV and LDAP sides with CN whitelisting
 - Configurable vCard-to-LDAP attribute mapping
+- Multi-user: different LDAP bind DNs serve different CardDAV phonebooks
 - Cached mode with periodic background refresh, or real-time mode with CardDAV server-side filtering per LDAP search
-- Optional LDAP client IP forwarding in the User-Agent for real-time searches
+- Optional LDAP requester forwarding (bind DN + IP) in the User-Agent for real-time searches
 - Configuration via YAML file, environment variables, or both
 - Docker-ready with rootless container and configurable UID
 
@@ -107,7 +108,7 @@ All settings can be provided via a YAML config file, environment variables, or b
 | `carddav.refresh_interval` | `CARDDAV_REFRESH_INTERVAL` | `300` | Seconds between contact re-fetches |
 | `carddav.realtime` | `CARDDAV_REALTIME` | `false` | Fetch from CardDAV on each LDAP search (see below) |
 | `carddav.http3` | `CARDDAV_HTTP3` | `false` | Enable HTTP/3 (QUIC) for CardDAV connections (see below) |
-| `carddav.forward_client_ip` | `CARDDAV_FORWARD_CLIENT_IP` | `true` | Append LDAP client IP:port to User-Agent in real-time mode |
+| `carddav.forward_requester` | `CARDDAV_FORWARD_REQUESTER` | `true` | Append LDAP requester info (bind DN, IP:port) to User-Agent in real-time mode |
 
 ### LDAP server settings
 
@@ -160,6 +161,37 @@ The default mapping produces standard `inetOrgPerson` entries. Contacts with mul
 
 Attribute mapping is only configurable via the YAML config file, not via environment variables.
 
+## Multi-user mode
+
+Different LDAP bind DNs can serve different CardDAV phonebooks. Each account has its own bind credentials and CardDAV connection settings. The top-level `carddav` section provides defaults that accounts inherit and can override.
+
+```yaml
+carddav:
+  verify_ssl: true
+  refresh_interval: 300
+
+accounts:
+  - bind_dn: cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at
+    bind_password: pass1
+    carddav:
+      url: https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
+      username: alice
+      password: alices-app-password
+  - bind_dn: cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
+    bind_password: pass2
+    carddav:
+      url: https://cloud.example.com/remote.php/dav/addressbooks/users/bob/contacts/
+      username: bob
+      password: bobs-app-password
+      realtime: true  # this account uses real-time mode
+```
+
+When `accounts` is present, `ldap.bind_dn` / `ldap.bind_password` are ignored. Without `accounts`, a single implicit account is created from the top-level `carddav` + `ldap.bind_dn`/`ldap.bind_password` (backward compatible).
+
+An account with empty `bind_dn` and `bind_password` allows anonymous access. If no anonymous account is defined, unauthenticated clients are rejected.
+
+Multi-user mode is only configurable via the YAML config file, not via environment variables.
+
 ## Real-time mode
 
 By default, contacts are fetched from CardDAV at startup and refreshed periodically in the background. In real-time mode, the server queries CardDAV on every LDAP search request instead.
@@ -181,23 +213,23 @@ Real-time mode is useful when the address book changes frequently and you want i
 
 When real-time mode is enabled, `refresh_interval` is ignored.
 
-### Client IP forwarding
+### Requester forwarding
 
-In real-time mode, you can optionally include the LDAP client's IP address and source port in the `User-Agent` header sent to the CardDAV server. This can be useful for debugging or access logging on the CardDAV side.
+In real-time mode, the LDAP requester's bind DN and IP address are included in the `User-Agent` header sent to the CardDAV server. This is useful for debugging or access logging on the CardDAV side.
 
 ```yaml
 carddav:
   realtime: true
-  forward_client_ip: true
+  forward_requester: true
 ```
 
 This produces a User-Agent like:
 
 ```
-carddav-to-ldap.mwllgr.at/0.4.0 @ 192.168.1.4:82842
+carddav-to-ldap.mwllgr.at/0.4.0 @ cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at 192.168.1.4:82842
 ```
 
-Enabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent. Set `forward_client_ip: false` to disable.
+Enabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent. Set `forward_requester: false` to disable.
 
 ## HTTP/3
 

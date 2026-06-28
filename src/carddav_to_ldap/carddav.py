@@ -218,16 +218,25 @@ def build_carddav_filter(terms: list[tuple[str, str]]) -> str:
     return f'<c:filter test="anyof">{"".join(prop_filters)}</c:filter>'
 
 
-def _user_agent_for_peer(peer: tuple | None) -> str:
+def _user_agent_for_requester(requester: object | None) -> str:
+    if requester is None:
+        return USER_AGENT
+    parts = [USER_AGENT, "@"]
+    bind_dn = getattr(requester, "bind_dn", "")
+    if bind_dn:
+        parts.append(bind_dn)
+    peer = getattr(requester, "peer", None)
     if peer and len(peer) >= 2:
-        return f"{USER_AGENT} @ {peer[0]}:{peer[1]}"
-    return USER_AGENT
+        parts.append(f"{peer[0]}:{peer[1]}")
+    if len(parts) == 2:
+        return USER_AGENT
+    return " ".join(parts)
 
 
 def search_contacts(
     cfg: CardDAVConfig,
     terms: list[tuple[str, str]],
-    peer: tuple | None = None,
+    requester: object | None = None,
 ) -> list[vobject.base.Component]:
     client = _build_client(cfg)
     carddav_filter = build_carddav_filter(terms)
@@ -239,8 +248,8 @@ def search_contacts(
         "Content-Type": "application/xml; charset=utf-8",
         "Depth": "1",
     }
-    if cfg.forward_client_ip and peer:
-        headers["User-Agent"] = _user_agent_for_peer(peer)
+    if cfg.forward_requester and requester:
+        headers["User-Agent"] = _user_agent_for_requester(requester)
 
     resp = client.request("REPORT", cfg.url, content=body, headers=headers)
     resp.raise_for_status()

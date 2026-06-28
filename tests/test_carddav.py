@@ -7,8 +7,9 @@ import pytest
 
 from carddav_to_ldap.carddav import (
     _build_client, _discover_vcards, _fetch_vcards, fetch_contacts,
-    build_carddav_filter, search_contacts, _user_agent_for_peer, USER_AGENT,
+    build_carddav_filter, search_contacts, _user_agent_for_requester, USER_AGENT,
 )
+from carddav_to_ldap.ldap_server import RequesterInfo
 from carddav_to_ldap.config import CardDAVConfig
 
 
@@ -268,7 +269,7 @@ class TestSearchContacts:
         assert "prop-filter" not in body
 
     @patch("carddav_to_ldap.carddav._build_client")
-    def test_search_forwards_client_ip(self, mock_build):
+    def test_search_forwards_requester(self, mock_build):
         mock_client = MagicMock()
         mock_build.return_value = mock_client
         mock_response = MagicMock()
@@ -276,12 +277,13 @@ class TestSearchContacts:
         mock_response.raise_for_status = MagicMock()
         mock_client.request.return_value = mock_response
 
-        cfg = CardDAVConfig(url="https://dav.example.com/contacts/", forward_client_ip=True)
-        search_contacts(cfg, [("cn", "John")], peer=("192.168.1.4", 82842))
+        cfg = CardDAVConfig(url="https://dav.example.com/contacts/", forward_requester=True)
+        requester = RequesterInfo(peer=("192.168.1.4", 82842), bind_dn="cn=user1")
+        search_contacts(cfg, [("cn", "John")], requester=requester)
 
         call_args = mock_client.request.call_args
         headers = call_args[1].get("headers", {})
-        assert headers["User-Agent"] == f"{USER_AGENT} @ 192.168.1.4:82842"
+        assert headers["User-Agent"] == f"{USER_AGENT} @ cn=user1 192.168.1.4:82842"
 
     @patch("carddav_to_ldap.carddav._build_client")
     def test_search_no_forward_without_config(self, mock_build):
@@ -292,21 +294,32 @@ class TestSearchContacts:
         mock_response.raise_for_status = MagicMock()
         mock_client.request.return_value = mock_response
 
-        cfg = CardDAVConfig(url="https://dav.example.com/contacts/", forward_client_ip=False)
-        search_contacts(cfg, [("cn", "John")], peer=("192.168.1.4", 82842))
+        cfg = CardDAVConfig(url="https://dav.example.com/contacts/", forward_requester=False)
+        requester = RequesterInfo(peer=("192.168.1.4", 82842), bind_dn="cn=user1")
+        search_contacts(cfg, [("cn", "John")], requester=requester)
 
         call_args = mock_client.request.call_args
         headers = call_args[1].get("headers", {})
         assert "User-Agent" not in headers
 
 
-class TestUserAgentForPeer:
-    def test_with_peer(self):
-        assert _user_agent_for_peer(("192.168.1.4", 82842)) == f"{USER_AGENT} @ 192.168.1.4:82842"
+class TestUserAgentForRequester:
+    def test_with_peer_and_bind_dn(self):
+        r = RequesterInfo(peer=("192.168.1.4", 82842), bind_dn="cn=user1")
+        assert _user_agent_for_requester(r) == f"{USER_AGENT} @ cn=user1 192.168.1.4:82842"
+
+    def test_with_peer_only(self):
+        r = RequesterInfo(peer=("192.168.1.4", 82842))
+        assert _user_agent_for_requester(r) == f"{USER_AGENT} @ 192.168.1.4:82842"
+
+    def test_with_bind_dn_only(self):
+        r = RequesterInfo(bind_dn="cn=user1")
+        assert _user_agent_for_requester(r) == f"{USER_AGENT} @ cn=user1"
 
     def test_with_none(self):
-        assert _user_agent_for_peer(None) == USER_AGENT
+        assert _user_agent_for_requester(None) == USER_AGENT
 
-    def test_with_empty_tuple(self):
-        assert _user_agent_for_peer(()) == USER_AGENT
+    def test_with_empty_requester(self):
+        r = RequesterInfo()
+        assert _user_agent_for_requester(r) == USER_AGENT
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 import re
 import ssl
@@ -196,22 +197,35 @@ def extract_filter_terms(el: BERElement) -> list[tuple[str, str]]:
     return terms
 
 
+@dataclasses.dataclass
+class RequesterInfo:
+    peer: tuple | None = None
+    bind_dn: str = ""
+
+
+SearchFn = Callable[[list[tuple[str, str]], RequesterInfo | None], list[dict[str, Any]]]
+
+
+@dataclasses.dataclass
+class HandlerAccount:
+    bind_dn: str
+    bind_password: str
+    entries: list[dict[str, Any]]
+    search_fn: SearchFn | None = None
+
+
 class LDAPRequestHandler:
     def __init__(
         self,
-        entries: list[dict[str, Any]],
+        accounts: list[HandlerAccount],
         base_dn: str,
-        bind_dn: str = "",
-        bind_password: str = "",
-        search_fn: Callable[[list[tuple[str, str]], tuple | None], list[dict[str, Any]]] | None = None,
     ):
-        self.entries = entries
+        self.accounts = accounts
         self.base_dn = base_dn.lower()
-        self.bind_dn = bind_dn
-        self.bind_password = bind_password
-        self.search_fn = search_fn
 
-    def handle_message(self, msg: BERElement, peer: tuple | None = None) -> list[bytes]:
+    def handle_message(self, msg: BERElement, peer: tuple | None = None, conn_state: dict | None = None) -> list[bytes]:
+        if conn_state is None:
+            conn_state = {}
         children = msg.value if isinstance(msg.value, list) else []
         if len(children) < 2:
             return []
@@ -221,15 +235,16 @@ class LDAPRequestHandler:
 
         if op.tag_class == TagClass.APPLICATION:
             if op.tag_number == 0:  # BindRequest
-                return self._handle_bind(message_id, op)
+                return self._handle_bind(message_id, op, conn_state)
             if op.tag_number == 3:  # SearchRequest
-                return self._handle_search(message_id, op, peer)
+                return self._handle_search(message_id, op, peer, conn_state)
             if op.tag_number == 2:  # UnbindRequest
+                conn_state.pop("account", None)
                 return []
 
         return [_build_search_result_done(message_id, LDAP_OPERATIONS_ERROR, "Unsupported operation")]
 
-    def _handle_bind(self, message_id: int, op: BERElement) -> list[bytes]:
+    def _handle_bind(self, message_id: int, op: BERElement, conn_state: dict) -> list[bytes]:
         children = op.value if isinstance(op.value, list) else []
         if len(children) >= 3:
             bind_name = ber.decode_string(children[1])
@@ -239,13 +254,26 @@ class LDAPRequestHandler:
             bind_name = ""
             bind_pw = ""
 
-        if self.bind_dn and self.bind_password:
-            if bind_name != self.bind_dn or bind_pw != self.bind_password:
-                return [_build_bind_response(message_id, LDAP_INVALID_CREDENTIALS, message="Invalid credentials")]
+        anonymous_account: HandlerAccount | None = None
+        for account in self.accounts:
+            if not account.bind_dn and not account.bind_password:
+                anonymous_account = account
+                continue
+            if bind_name == account.bind_dn and bind_pw == account.bind_password:
+                conn_state["account"] = account
+                return [_build_bind_response(message_id, LDAP_SUCCESS)]
 
-        return [_build_bind_response(message_id, LDAP_SUCCESS)]
+        if anonymous_account is not None and not bind_name and not bind_pw:
+            conn_state["account"] = anonymous_account
+            return [_build_bind_response(message_id, LDAP_SUCCESS)]
 
-    def _handle_search(self, message_id: int, op: BERElement, peer: tuple | None = None) -> list[bytes]:
+        return [_build_bind_response(message_id, LDAP_INVALID_CREDENTIALS, message="Invalid credentials")]
+
+    def _handle_search(self, message_id: int, op: BERElement, peer: tuple | None, conn_state: dict) -> list[bytes]:
+        account: HandlerAccount | None = conn_state.get("account")
+        if account is None:
+            return [_build_search_result_done(message_id, LDAP_INVALID_CREDENTIALS, "Bind required")]
+
         req = _parse_search_request(op)
         if not req:
             return [_build_search_result_done(message_id, LDAP_OPERATIONS_ERROR)]
@@ -253,15 +281,16 @@ class LDAPRequestHandler:
         base = req["base_dn"].lower()
         scope = req["scope"]  # 0=base, 1=oneLevel, 2=subtree
 
-        if self.search_fn is not None:
+        if account.search_fn is not None:
             try:
                 terms = extract_filter_terms(req["filter"])
-                search_entries = self.search_fn(terms, peer)
+                requester = RequesterInfo(peer=peer, bind_dn=account.bind_dn)
+                search_entries = account.search_fn(terms, requester)
             except Exception:
                 logger.exception("Real-time search failed")
                 return [_build_search_result_done(message_id, LDAP_OPERATIONS_ERROR, "Backend search failed")]
         else:
-            search_entries = self.entries
+            search_entries = account.entries
 
         if scope == 0:
             for entry in search_entries:
@@ -299,8 +328,8 @@ class LDAPRequestHandler:
         results.append(_build_search_result_done(message_id, LDAP_SUCCESS))
         return results
 
-    def update_entries(self, entries: list[dict[str, Any]]) -> None:
-        self.entries = entries
+    def update_account_entries(self, index: int, entries: list[dict[str, Any]]) -> None:
+        self.accounts[index].entries = entries
 
 
 class LDAPServer:
@@ -344,6 +373,7 @@ class LDAPServer:
                 return
             logger.info("Accepted client with CN '%s'", cn)
 
+        conn_state: dict = {}
         buf = b""
         try:
             while True:
@@ -357,7 +387,7 @@ class LDAPServer:
                     if msg is None:
                         break
 
-                    responses = self.handler.handle_message(msg, peer)
+                    responses = self.handler.handle_message(msg, peer, conn_state)
                     if not responses:
                         writer.close()
                         await writer.wait_closed()

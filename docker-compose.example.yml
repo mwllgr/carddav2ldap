@@ -23,7 +23,7 @@ services:
       # CARDDAV_REFRESH_INTERVAL: "300"
       # CARDDAV_REALTIME: "false"  # Fetch from CardDAV on each LDAP search instead of caching
       # CARDDAV_HTTP3: "false"  # Enable HTTP/3 (requires curl_cffi)
-      # CARDDAV_FORWARD_CLIENT_IP: "true"  # Append LDAP client IP:port to User-Agent (real-time mode)
+      # CARDDAV_FORWARD_REQUESTER: "true"  # Append LDAP requester info to User-Agent (real-time mode)
 
       # LDAP server
       # LDAP_HOST: 0.0.0.0
