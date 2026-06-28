@@ -59,6 +59,28 @@ cp docker-compose.example.yml docker-compose.yml
 docker compose up -d
 ```
 
+### Nextcloud example
+
+The CardDAV URL for Nextcloud follows the pattern `https://<host>/remote.php/dav/addressbooks/users/<username>/<addressbook>/`. The default address book is called `contacts`:
+
+```bash
+export CARDDAV_URL=https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
+export CARDDAV_USERNAME=alice
+export CARDDAV_PASSWORD=my-app-password
+carddav-to-ldap
+```
+
+Or with a config file:
+
+```yaml
+carddav:
+  url: https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
+  username: alice
+  password: my-app-password
+```
+
+> **Tip:** Use an [app password](https://docs.nextcloud.com/server/latest/user_manual/en/session_management.html#managing-devices) instead of your login password, especially if you have two-factor authentication enabled.
+
 ### Verbose logging
 
 ```bash
