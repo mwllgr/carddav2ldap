@@ -21,6 +21,7 @@ services:
       # CARDDAV_CLIENT_KEY: /certs/client.key
       # CARDDAV_VERIFY_SSL: "true"
       # CARDDAV_REFRESH_INTERVAL: "300"
+      # CARDDAV_REALTIME: "false"  # Fetch from CardDAV on each LDAP search instead of caching
 
       # LDAP server
       # LDAP_HOST: 0.0.0.0

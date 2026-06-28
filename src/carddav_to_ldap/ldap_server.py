@@ -5,6 +5,7 @@ import asyncio
 import logging
 import re
 import ssl
+from collections.abc import Callable
 from typing import Any
 
 from . import ber
@@ -159,6 +160,42 @@ def _filter_attributes(entry_attrs: dict[str, list[str]], requested: list[str]) 
     return {k: v for k, v in entry_attrs.items() if k.lower() in req_lower}
 
 
+def extract_filter_terms(el: BERElement) -> list[tuple[str, str]]:
+    """Extract (ldap_attribute, search_value) pairs from an LDAP filter."""
+    terms: list[tuple[str, str]] = []
+    if el.tag_class != TagClass.CONTEXT:
+        return terms
+
+    children = el.value if isinstance(el.value, list) else []
+
+    if el.tag_number in (0, 1):  # AND, OR
+        for child in children:
+            terms.extend(extract_filter_terms(child))
+
+    elif el.tag_number == 2:  # NOT
+        if children:
+            terms.extend(extract_filter_terms(children[0]))
+
+    elif el.tag_number == 3:  # equalityMatch
+        if len(children) >= 2:
+            attr = ber.decode_string(children[0])
+            val = ber.decode_string(children[1])
+            if attr.lower() != "objectclass":
+                terms.append((attr, val))
+
+    elif el.tag_number == 4:  # substrings
+        if len(children) >= 2:
+            attr = ber.decode_string(children[0])
+            sub_children = children[1].value if isinstance(children[1].value, list) else []
+            for sub in sub_children:
+                if isinstance(sub.value, bytes):
+                    val = sub.value.decode("utf-8")
+                    if val:
+                        terms.append((attr, val))
+
+    return terms
+
+
 class LDAPRequestHandler:
     def __init__(
         self,
@@ -166,11 +203,13 @@ class LDAPRequestHandler:
         base_dn: str,
         bind_dn: str = "",
         bind_password: str = "",
+        search_fn: Callable[[list[tuple[str, str]]], list[dict[str, Any]]] | None = None,
     ):
         self.entries = entries
         self.base_dn = base_dn.lower()
         self.bind_dn = bind_dn
         self.bind_password = bind_password
+        self.search_fn = search_fn
 
     def handle_message(self, msg: BERElement) -> list[bytes]:
         children = msg.value if isinstance(msg.value, list) else []
@@ -214,8 +253,18 @@ class LDAPRequestHandler:
         base = req["base_dn"].lower()
         scope = req["scope"]  # 0=base, 1=oneLevel, 2=subtree
 
+        if self.search_fn is not None:
+            try:
+                terms = extract_filter_terms(req["filter"])
+                search_entries = self.search_fn(terms)
+            except Exception:
+                logger.exception("Real-time search failed")
+                return [_build_search_result_done(message_id, LDAP_OPERATIONS_ERROR, "Backend search failed")]
+        else:
+            search_entries = self.entries
+
         if scope == 0:
-            for entry in self.entries:
+            for entry in search_entries:
                 if entry["dn"].lower() == base:
                     attrs = {k.lower(): v for k, v in entry["attributes"].items()}
                     if _parse_filter(req["filter"], attrs):
@@ -236,7 +285,7 @@ class LDAPRequestHandler:
         count = 0
         size_limit = req["size_limit"] if req["size_limit"] > 0 else 0
 
-        for entry in self.entries:
+        for entry in search_entries:
             attrs = {k.lower(): v for k, v in entry["attributes"].items()}
             if _parse_filter(req["filter"], attrs):
                 filtered = _filter_attributes(entry["attributes"], req["attributes"])

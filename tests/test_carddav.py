@@ -7,7 +7,10 @@ import ssl
 
 import pytest
 
-from carddav_to_ldap.carddav import _build_session, _discover_vcards, _fetch_vcards, fetch_contacts
+from carddav_to_ldap.carddav import (
+    _build_session, _discover_vcards, _fetch_vcards, fetch_contacts,
+    build_carddav_filter, search_contacts,
+)
 from carddav_to_ldap.config import CardDAVConfig
 
 
@@ -190,6 +193,80 @@ class TestFetchContacts:
         mock_build.assert_called_once_with(cfg)
         mock_discover.assert_called_once_with(mock_session, cfg.url)
         mock_fetch.assert_called_once_with(mock_session, cfg.url, ["/john.vcf"])
+
+
+class TestBuildCardDAVFilter:
+    def test_empty_terms(self):
+        assert build_carddav_filter([]) == ""
+
+    def test_single_cn_term(self):
+        result = build_carddav_filter([("cn", "John")])
+        assert '<c:prop-filter name="FN">' in result
+        assert '<c:text-match' in result
+        assert "John" in result
+        assert 'test="anyof"' in result
+
+    def test_tel_term(self):
+        result = build_carddav_filter([("telephoneNumber", "555")])
+        assert '<c:prop-filter name="TEL">' in result
+        assert "555" in result
+
+    def test_multiple_terms(self):
+        result = build_carddav_filter([("cn", "John"), ("mail", "john@")])
+        assert '<c:prop-filter name="FN">' in result
+        assert '<c:prop-filter name="EMAIL">' in result
+
+    def test_deduplicates(self):
+        result = build_carddav_filter([("cn", "John"), ("cn", "John")])
+        assert result.count("prop-filter") == 2  # opening + closing
+
+    def test_xml_escapes_special_chars(self):
+        result = build_carddav_filter([("cn", "O&M <Corp>")])
+        assert "&amp;" in result
+        assert "&lt;" in result
+        assert "&gt;" in result
+
+    def test_unknown_attr_defaults_to_fn(self):
+        result = build_carddav_filter([("unknownAttr", "test")])
+        assert '<c:prop-filter name="FN">' in result
+
+
+class TestSearchContacts:
+    @patch("carddav_to_ldap.carddav._build_session")
+    def test_search_sends_report(self, mock_build):
+        mock_session = MagicMock()
+        mock_build.return_value = mock_session
+        mock_response = MagicMock()
+        mock_response.text = REPORT_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_session.request.return_value = mock_response
+
+        cfg = CardDAVConfig(url="https://dav.example.com/contacts/")
+        result = search_contacts(cfg, [("cn", "John")])
+
+        assert len(result) == 2
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "REPORT"
+        body = call_args[1].get("data") or call_args[0][2]
+        assert "addressbook-query" in body
+        assert "prop-filter" in body
+
+    @patch("carddav_to_ldap.carddav._build_session")
+    def test_search_empty_terms_fetches_all(self, mock_build):
+        mock_session = MagicMock()
+        mock_build.return_value = mock_session
+        mock_response = MagicMock()
+        mock_response.text = REPORT_RESPONSE
+        mock_response.raise_for_status = MagicMock()
+        mock_session.request.return_value = mock_response
+
+        cfg = CardDAVConfig(url="https://dav.example.com/contacts/")
+        result = search_contacts(cfg, [])
+
+        assert len(result) == 2
+        call_args = mock_session.request.call_args
+        body = call_args[1].get("data") or call_args[0][2]
+        assert "prop-filter" not in body
 
 
 class TestCardDAVWithTLS:

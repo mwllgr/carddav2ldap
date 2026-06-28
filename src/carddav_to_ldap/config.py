@@ -35,6 +35,7 @@ class CardDAVConfig:
     client_key: str | None = None
     verify_ssl: bool = True
     refresh_interval: int = 300
+    realtime: bool = False
 
     @classmethod
     def from_dict(cls, d: dict) -> CardDAVConfig:
@@ -107,6 +108,9 @@ DEFAULT_ATTRIBUTE_MAPPING = {
     "telephoneNumber": ["tel"],
     "mobile": ["tel.cell"],
     "homePhone": ["tel.home"],
+    "workPhone": ["tel.work"],
+    "facsimileTelephoneNumber": ["tel.fax"],
+    "pager": ["tel.pager"],
     "title": ["title"],
     "o": ["org"],
     "street": ["adr.street"],

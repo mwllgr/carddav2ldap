@@ -16,6 +16,7 @@ from carddav_to_ldap.ldap_server import (
     _build_search_result_entry,
     _parse_filter,
     create_ssl_context,
+    extract_filter_terms,
 )
 
 SAMPLE_ENTRIES = [
@@ -365,6 +366,64 @@ class TestLDAPRequestHandler:
         entries = [p for p in all_parsed if p["op_tag"] == 4]
         assert len(entries) == 0
 
+    def test_search_fn_callback(self):
+        def fake_search(terms):
+            return [SAMPLE_ENTRIES[0]]
+
+        handler = LDAPRequestHandler(
+            entries=[],
+            base_dn="dc=contacts,dc=local",
+            search_fn=fake_search,
+        )
+        req = _build_search_request(20)
+        msg, _ = ber.read_ldap_message(req)
+        responses = handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 1
+
+    def test_search_fn_receives_terms(self):
+        received_terms = []
+
+        def capture_search(terms):
+            received_terms.extend(terms)
+            return SAMPLE_ENTRIES
+
+        handler = LDAPRequestHandler(
+            entries=[],
+            base_dn="dc=contacts,dc=local",
+            search_fn=capture_search,
+        )
+        eq_filter = BERElement(TagClass.CONTEXT, True, 3, [
+            encode_string("cn"),
+            encode_string("John"),
+        ])
+        req = _build_search_request(21, filter_el=eq_filter)
+        msg, _ = ber.read_ldap_message(req)
+        handler.handle_message(msg)
+        assert ("cn", "John") in received_terms
+
+    def test_search_fn_error_returns_error(self):
+        def failing_search(terms):
+            raise ConnectionError("CardDAV down")
+
+        handler = LDAPRequestHandler(
+            entries=[],
+            base_dn="dc=contacts,dc=local",
+            search_fn=failing_search,
+        )
+        req = _build_search_request(22)
+        msg, _ = ber.read_ldap_message(req)
+        responses = handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        done = [p for p in all_parsed if p["op_tag"] == 5]
+        assert len(done) == 1
+        assert ber.decode_enumerated(done[0]["op"].value[0]) == 1  # operationsError
+
     def test_update_entries(self):
         self.handler.update_entries([SAMPLE_ENTRIES[0]])
         req = _build_search_request(11)
@@ -512,3 +571,76 @@ class TestLDAPServerIntegration:
             await writer.wait_closed()
         finally:
             await server.stop()
+
+
+class TestExtractFilterTerms:
+    def test_equality(self):
+        el = BERElement(TagClass.CONTEXT, True, 3, [
+            encode_string("cn"),
+            encode_string("John Doe"),
+        ])
+        terms = extract_filter_terms(el)
+        assert terms == [("cn", "John Doe")]
+
+    def test_substring(self):
+        el = BERElement(TagClass.CONTEXT, True, 4, [
+            encode_string("cn"),
+            BERElement(TagClass.UNIVERSAL, True, 0x10, [
+                BERElement(TagClass.CONTEXT, False, 1, b"Doe"),
+            ]),
+        ])
+        terms = extract_filter_terms(el)
+        assert terms == [("cn", "Doe")]
+
+    def test_present_skipped(self):
+        el = BERElement(TagClass.CONTEXT, False, 7, b"objectClass")
+        terms = extract_filter_terms(el)
+        assert terms == []
+
+    def test_objectclass_equality_skipped(self):
+        el = BERElement(TagClass.CONTEXT, True, 3, [
+            encode_string("objectClass"),
+            encode_string("inetOrgPerson"),
+        ])
+        terms = extract_filter_terms(el)
+        assert terms == []
+
+    def test_and_recurses(self):
+        el = BERElement(TagClass.CONTEXT, True, 0, [
+            BERElement(TagClass.CONTEXT, True, 3, [
+                encode_string("cn"),
+                encode_string("John"),
+            ]),
+            BERElement(TagClass.CONTEXT, True, 3, [
+                encode_string("mail"),
+                encode_string("john@"),
+            ]),
+        ])
+        terms = extract_filter_terms(el)
+        assert ("cn", "John") in terms
+        assert ("mail", "john@") in terms
+
+    def test_or_recurses(self):
+        el = BERElement(TagClass.CONTEXT, True, 1, [
+            BERElement(TagClass.CONTEXT, True, 3, [
+                encode_string("cn"),
+                encode_string("John"),
+            ]),
+            BERElement(TagClass.CONTEXT, True, 3, [
+                encode_string("telephoneNumber"),
+                encode_string("555"),
+            ]),
+        ])
+        terms = extract_filter_terms(el)
+        assert ("cn", "John") in terms
+        assert ("telephoneNumber", "555") in terms
+
+    def test_not_recurses(self):
+        el = BERElement(TagClass.CONTEXT, True, 2, [
+            BERElement(TagClass.CONTEXT, True, 3, [
+                encode_string("cn"),
+                encode_string("John"),
+            ]),
+        ])
+        terms = extract_filter_terms(el)
+        assert terms == [("cn", "John")]

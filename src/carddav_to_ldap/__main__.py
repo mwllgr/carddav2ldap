@@ -7,7 +7,7 @@ import signal
 import sys
 import time
 
-from .carddav import fetch_contacts
+from .carddav import fetch_contacts, search_contacts
 from .config import Config
 from .ldap_server import LDAPRequestHandler, LDAPServer, create_ssl_context
 from .mapping import vcard_to_ldap_entry
@@ -36,14 +36,33 @@ async def _refresh_loop(cfg: Config, handler: LDAPRequestHandler) -> None:
             logger.exception("Failed to refresh contacts from CardDAV")
 
 
+def _make_search_fn(cfg: Config):
+    def search_fn(terms: list[tuple[str, str]]) -> list[dict]:
+        vcards = search_contacts(cfg.carddav, terms)
+        entries = []
+        for vcard in vcards:
+            entry = vcard_to_ldap_entry(vcard, cfg.attribute_mapping, cfg.ldap.base_dn)
+            if entry:
+                entries.append(entry)
+        return entries
+    return search_fn
+
+
 async def _run(cfg: Config) -> None:
-    entries = _build_entries(cfg)
+    search_fn = None
+    if cfg.carddav.realtime:
+        logger.info("Real-time mode enabled — fetching contacts on each LDAP search")
+        search_fn = _make_search_fn(cfg)
+        entries: list[dict] = []
+    else:
+        entries = _build_entries(cfg)
 
     handler = LDAPRequestHandler(
         entries=entries,
         base_dn=cfg.ldap.base_dn,
         bind_dn=cfg.ldap.bind_dn,
         bind_password=cfg.ldap.bind_password,
+        search_fn=search_fn,
     )
 
     ssl_context = None
@@ -69,13 +88,16 @@ async def _run(cfg: Config) -> None:
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, lambda: asyncio.ensure_future(server.stop()))
 
-    refresh_task = asyncio.create_task(_refresh_loop(cfg, handler))
+    refresh_task = None
+    if not cfg.carddav.realtime:
+        refresh_task = asyncio.create_task(_refresh_loop(cfg, handler))
     try:
         await server.serve_forever()
     except asyncio.CancelledError:
         pass
     finally:
-        refresh_task.cancel()
+        if refresh_task:
+            refresh_task.cancel()
 
 
 def main() -> None:

@@ -80,6 +80,7 @@ class TestVcardToLdapEntry:
         assert "+1-555-0102" in attrs["telephoneNumber"]
         assert attrs["mobile"] == ["+1-555-0101"]
         assert attrs["homePhone"] == ["+1-555-0102"]
+        assert attrs["workPhone"] == ["+1-555-0100"]
         assert "inetOrgPerson" in attrs["objectClass"]
 
     def test_minimal_contact(self, sample_vcard_minimal):

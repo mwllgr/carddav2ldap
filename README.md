@@ -103,6 +103,7 @@ All settings can be provided via a YAML config file, environment variables, or b
 | `carddav.client_key` | `CARDDAV_CLIENT_KEY` | — | Client key for mTLS to the CardDAV server |
 | `carddav.verify_ssl` | `CARDDAV_VERIFY_SSL` | `true` | Whether to verify the server's TLS certificate |
 | `carddav.refresh_interval` | `CARDDAV_REFRESH_INTERVAL` | `300` | Seconds between contact re-fetches |
+| `carddav.realtime` | `CARDDAV_REALTIME` | `false` | Fetch from CardDAV on each LDAP search (see below) |
 
 ### LDAP server settings
 
@@ -141,6 +142,8 @@ The `attribute_mapping` section maps LDAP attribute names to vCard property path
 | `tel.cell` | Mobile phone numbers (TEL with TYPE=CELL) |
 | `tel.home` | Home phone numbers (TEL with TYPE=HOME) |
 | `tel.work` | Work phone numbers (TEL with TYPE=WORK) |
+| `tel.fax` | Fax numbers (TEL with TYPE=FAX) |
+| `tel.pager` | Pager numbers (TEL with TYPE=PAGER) |
 | `org` | Organization |
 | `title` | Job title |
 | `adr.street` | Street address |
@@ -152,6 +155,27 @@ The `attribute_mapping` section maps LDAP attribute names to vCard property path
 The default mapping produces standard `inetOrgPerson` entries. Contacts with multiple phone numbers will have all numbers included in the `telephoneNumber` attribute.
 
 Attribute mapping is only configurable via the YAML config file, not via environment variables.
+
+## Real-time mode
+
+By default, contacts are fetched from CardDAV at startup and refreshed periodically in the background. In real-time mode, the server queries CardDAV on every LDAP search request instead.
+
+LDAP search filters are translated to CardDAV `addressbook-query` prop-filters, so the CardDAV server only returns matching contacts rather than the full address book. The LDAP filter is still applied on the results for exact matching.
+
+```yaml
+carddav:
+  realtime: true
+```
+
+Or via environment variable:
+
+```bash
+export CARDDAV_REALTIME=true
+```
+
+Real-time mode is useful when the address book changes frequently and you want instant visibility, or when the address book is very large and you prefer not to cache it. The trade-off is higher latency per search (a CardDAV round-trip) and more load on the CardDAV server.
+
+When real-time mode is enabled, `refresh_interval` is ignored.
 
 ## LDAPS and mTLS
 

@@ -16,6 +16,11 @@ carddav:
   # How often to re-fetch contacts from the CardDAV server (seconds)
   refresh_interval: 300
 
+  # Real-time mode: fetch contacts from CardDAV on each LDAP search
+  # instead of caching them. Uses CardDAV server-side filtering to
+  # only fetch matching contacts. Disables periodic refresh.
+  # realtime: false
+
 ldap:
   host: 0.0.0.0
   # port: auto-detected (389 for LDAP, 636 for LDAPS) — override to set explicitly
@@ -49,6 +54,9 @@ attribute_mapping:
   telephoneNumber: [tel]
   mobile: [tel.cell]
   homePhone: [tel.home]
+  workPhone: [tel.work]
+  facsimileTelephoneNumber: [tel.fax]
+  pager: [tel.pager]
   title: [title]
   o: [org]
   street: [adr.street]
