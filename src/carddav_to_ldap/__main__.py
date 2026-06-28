@@ -49,6 +49,15 @@ def _make_search_fn(cfg: Config):
 
 
 async def _run(cfg: Config) -> None:
+    if cfg.carddav.http3:
+        try:
+            import curl_cffi  # noqa: F401
+        except ImportError:
+            raise SystemExit(
+                "HTTP/3 support requires curl_cffi. "
+                "Install it with: pip install carddav-to-ldap[http3]"
+            )
+
     search_fn = None
     if cfg.carddav.realtime:
         logger.info("Real-time mode enabled — fetching contacts on each LDAP search")

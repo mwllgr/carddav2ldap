@@ -5,7 +5,7 @@ WORKDIR /app
 COPY pyproject.toml VERSION.txt ./
 COPY src/ src/
 
-RUN apk add --no-cache su-exec && pip install --no-cache-dir .
+RUN apk add --no-cache su-exec && pip install --no-cache-dir ".[http3]"
 
 ENV PUID=1006
 
