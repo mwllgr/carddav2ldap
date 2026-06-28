@@ -3,24 +3,35 @@ services:
     build: .
     ports:
       - "389:389"
+      # - "636:636"  # Use this instead for LDAPS
+    # volumes:
+    #   - ./config.yaml:/app/config.yaml:ro
+    #   - ./certs:/certs:ro
+    # command: ["/app/config.yaml"]
     environment:
+      # CardDAV connection
       CARDDAV_URL: https://dav.example.com/addressbooks/user/contacts/
       CARDDAV_USERNAME: user@example.com
       CARDDAV_PASSWORD: secret
-      CARDDAV_REFRESH_INTERVAL: "300"
-      LDAP_BASE_DN: dc=carddav2ldap,dc=mwllgr,dc=at
-    restart: unless-stopped
+      # CARDDAV_CA_CERT: /certs/ca.crt
+      # CARDDAV_CLIENT_CERT: /certs/client.crt
+      # CARDDAV_CLIENT_KEY: /certs/client.key
+      # CARDDAV_VERIFY_SSL: "true"
+      # CARDDAV_REFRESH_INTERVAL: "300"
 
-  # Example with LDAPS and a config file
-  # carddav-to-ldap-tls:
-  #   build: .
-  #   ports:
-  #     - "636:636"
-  #   volumes:
-  #     - ./config.yaml:/app/config.yaml:ro
-  #     - ./certs:/certs:ro
-  #   command: ["/app/config.yaml"]
-  #   environment:
-  #     LDAP_TLS_CERT: /certs/server.crt
-  #     LDAP_TLS_KEY: /certs/server.key
-  #   restart: unless-stopped
+      # LDAP server
+      # LDAP_HOST: 0.0.0.0
+      # LDAP_PORT: "0"  # Auto: 389 for LDAP, 636 for LDAPS
+      # LDAP_BASE_DN: dc=carddav2ldap,dc=mwllgr,dc=at
+      # LDAP_BIND_DN: cn=admin,dc=carddav2ldap,dc=mwllgr,dc=at
+      # LDAP_BIND_PASSWORD: secret
+
+      # LDAPS / TLS
+      # LDAP_TLS_CERT: /certs/server.crt
+      # LDAP_TLS_KEY: /certs/server.key
+
+      # mTLS (LDAP client certificates)
+      # LDAP_TLS_CA: /certs/ca.crt
+      # LDAP_REQUIRE_CLIENT_CERT: "false"
+      # LDAP_ALLOWED_CLIENT_CNS: phone1.example.com,phone2.example.com
+    restart: unless-stopped
