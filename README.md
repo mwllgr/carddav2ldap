@@ -104,6 +104,7 @@ All settings can be provided via a YAML config file, environment variables, or b
 | `carddav.verify_ssl` | `CARDDAV_VERIFY_SSL` | `true` | Whether to verify the server's TLS certificate |
 | `carddav.refresh_interval` | `CARDDAV_REFRESH_INTERVAL` | `300` | Seconds between contact re-fetches |
 | `carddav.realtime` | `CARDDAV_REALTIME` | `false` | Fetch from CardDAV on each LDAP search (see below) |
+| `carddav.http3` | `CARDDAV_HTTP3` | `false` | Enable HTTP/3 (QUIC) for CardDAV connections (see below) |
 
 ### LDAP server settings
 
@@ -176,6 +177,29 @@ export CARDDAV_REALTIME=true
 Real-time mode is useful when the address book changes frequently and you want instant visibility, or when the address book is very large and you prefer not to cache it. The trade-off is higher latency per search (a CardDAV round-trip) and more load on the CardDAV server.
 
 When real-time mode is enabled, `refresh_interval` is ignored.
+
+## HTTP/3
+
+By default, the CardDAV client uses HTTP/2 (with HTTP/1.1 fallback). HTTP/3 (QUIC) can be enabled for lower latency connections, but requires an additional dependency:
+
+```bash
+pip install carddav-to-ldap[http3]
+```
+
+Then enable it in config:
+
+```yaml
+carddav:
+  http3: true
+```
+
+Or via environment variable:
+
+```bash
+export CARDDAV_HTTP3=true
+```
+
+HTTP/3 uses [`curl_cffi`](https://github.com/lexiforest/curl_cffi) under the hood. The CardDAV server must support HTTP/3 for this to have any effect.
 
 ## LDAPS and mTLS
 

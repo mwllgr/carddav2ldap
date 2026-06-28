@@ -36,6 +36,7 @@ class CardDAVConfig:
     verify_ssl: bool = True
     refresh_interval: int = 300
     realtime: bool = False
+    http3: bool = False
 
     @classmethod
     def from_dict(cls, d: dict) -> CardDAVConfig:

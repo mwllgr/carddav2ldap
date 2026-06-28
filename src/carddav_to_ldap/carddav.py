@@ -22,7 +22,24 @@ DAV_NS = "DAV:"
 CARDDAV_NS = "urn:ietf:params:xml:ns:carddav"
 
 
-def _build_client(cfg: CardDAVConfig) -> httpx.Client:
+class _CurlCffiAdapter:
+    """Thin wrapper around curl_cffi.requests.Session matching httpx.Client's interface."""
+
+    def __init__(self, session: object) -> None:
+        self._session = session
+
+    def request(self, method: str, url: str, *, content: str | None = None, headers: dict | None = None) -> object:
+        return self._session.request(method, url, data=content, headers=headers)
+
+
+def _build_client(cfg: CardDAVConfig) -> httpx.Client | _CurlCffiAdapter:
+    auth: tuple[str, str] | None = None
+    if cfg.username:
+        auth = (cfg.username, cfg.password)
+
+    if cfg.http3:
+        return _build_http3_client(cfg, auth)
+
     verify: ssl.SSLContext | bool = True
     if cfg.ca_cert:
         verify = ssl.create_default_context(cafile=cfg.ca_cert)
@@ -39,10 +56,6 @@ def _build_client(cfg: CardDAVConfig) -> httpx.Client:
         verify.load_cert_chain(cert[0], cert[1] if len(cert) > 1 else None)
         cert = None
 
-    auth: tuple[str, str] | None = None
-    if cfg.username:
-        auth = (cfg.username, cfg.password)
-
     return httpx.Client(
         http2=True,
         verify=verify,
@@ -50,6 +63,32 @@ def _build_client(cfg: CardDAVConfig) -> httpx.Client:
         auth=auth,
         headers={"User-Agent": USER_AGENT},
     )
+
+
+def _build_http3_client(cfg: CardDAVConfig, auth: tuple[str, str] | None) -> _CurlCffiAdapter:
+    try:
+        from curl_cffi.requests import Session
+    except ImportError:
+        raise ImportError(
+            "HTTP/3 support requires curl_cffi. "
+            "Install it with: pip install carddav-to-ldap[http3]"
+        )
+
+    session = Session(http_version=3)
+    session.headers["User-Agent"] = USER_AGENT
+
+    if auth:
+        session.auth = auth
+    if cfg.ca_cert:
+        session.verify = cfg.ca_cert
+    elif not cfg.verify_ssl:
+        session.verify = False
+    if cfg.client_cert and cfg.client_key:
+        session.cert = (cfg.client_cert, cfg.client_key)
+    elif cfg.client_cert:
+        session.cert = cfg.client_cert
+
+    return _CurlCffiAdapter(session)
 
 
 ADDRESSBOOK_MULTIGET_BODY = """\

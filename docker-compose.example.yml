@@ -22,6 +22,7 @@ services:
       # CARDDAV_VERIFY_SSL: "true"
       # CARDDAV_REFRESH_INTERVAL: "300"
       # CARDDAV_REALTIME: "false"  # Fetch from CardDAV on each LDAP search instead of caching
+      # CARDDAV_HTTP3: "false"  # Enable HTTP/3 (requires curl_cffi)
 
       # LDAP server
       # LDAP_HOST: 0.0.0.0

@@ -21,6 +21,10 @@ carddav:
   # only fetch matching contacts. Disables periodic refresh.
   # realtime: false
 
+  # Enable HTTP/3 (QUIC) for CardDAV connections.
+  # Requires: pip install carddav-to-ldap[http3]
+  # http3: false
+
 ldap:
   host: 0.0.0.0
   # port: auto-detected (389 for LDAP, 636 for LDAPS) — override to set explicitly
