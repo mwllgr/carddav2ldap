@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+requires = ["setuptools>=80.0", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,11 +7,11 @@ name = "carddav2ldap"
 dynamic = ["version"]
 description = "Bridge CardDAV contacts to an LDAP server for IP phones and other LDAP-only clients"
 license = "MIT"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
-    "httpx[http2]>=0.27",
-    "vobject>=0.9.7",
-    "pyyaml>=6.0",
+    "httpx[http2]>=0.28",
+    "vobject>=0.9.9",
+    "pyyaml>=6.0.3",
 ]
 
 [project.scripts]
@@ -29,9 +29,9 @@ asyncio_mode = "auto"
 
 [project.optional-dependencies]
 http3 = [
-    "curl_cffi>=0.7",
+    "curl_cffi>=0.15",
 ]
 dev = [
-    "pytest>=7.0",
-    "pytest-asyncio>=0.23",
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
 ]
