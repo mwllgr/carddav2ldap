@@ -28,7 +28,7 @@ carddav:
   # In real-time mode, append the LDAP client's IP:port to the
   # User-Agent header sent to the CardDAV server.
   # Example: carddav-to-ldap.mwllgr.at/0.4.0 @ 192.168.1.4:82842
-  # forward_client_ip: false
+  # forward_client_ip: true
 
 ldap:
   host: 0.0.0.0

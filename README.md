@@ -107,7 +107,7 @@ All settings can be provided via a YAML config file, environment variables, or b
 | `carddav.refresh_interval` | `CARDDAV_REFRESH_INTERVAL` | `300` | Seconds between contact re-fetches |
 | `carddav.realtime` | `CARDDAV_REALTIME` | `false` | Fetch from CardDAV on each LDAP search (see below) |
 | `carddav.http3` | `CARDDAV_HTTP3` | `false` | Enable HTTP/3 (QUIC) for CardDAV connections (see below) |
-| `carddav.forward_client_ip` | `CARDDAV_FORWARD_CLIENT_IP` | `false` | Append LDAP client IP:port to User-Agent in real-time mode |
+| `carddav.forward_client_ip` | `CARDDAV_FORWARD_CLIENT_IP` | `true` | Append LDAP client IP:port to User-Agent in real-time mode |
 
 ### LDAP server settings
 
@@ -197,7 +197,7 @@ This produces a User-Agent like:
 carddav-to-ldap.mwllgr.at/0.4.0 @ 192.168.1.4:82842
 ```
 
-Disabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent.
+Enabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent. Set `forward_client_ip: false` to disable.
 
 ## HTTP/3
 
