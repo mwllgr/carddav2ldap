@@ -75,8 +75,13 @@ async def _refresh_loop(cfg: Config, handler: LDAPRequestHandler) -> None:
 
 
 async def _run(cfg: Config) -> None:
+    if not cfg.accounts:
+        raise SystemExit(
+            "No accounts configured. Define accounts via the 'accounts' YAML section "
+            "or C2L_ACCOUNT_<N>_* environment variables."
+        )
+
     for account in cfg.accounts:
-        if account.carddav.http3:
             try:
                 import curl_cffi  # noqa: F401
             except ImportError:

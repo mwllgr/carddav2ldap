@@ -10,46 +10,43 @@ services:
     # command: ["/app/config.yaml"]
     environment:
       # Container user
-      # PUID: "1006"
+      # C2L_PUID: "1006"
 
-      # CardDAV connection
-      CARDDAV_URL: https://dav.example.com/addressbooks/user/contacts/
-      CARDDAV_USERNAME: user@example.com
-      CARDDAV_PASSWORD: secret
-      # CARDDAV_CA_CERT: /certs/ca.crt
-      # CARDDAV_CLIENT_CERT: /certs/client.crt
-      # CARDDAV_CLIENT_KEY: /certs/client.key
-      # CARDDAV_VERIFY_SSL: "true"
-      # CARDDAV_REFRESH_INTERVAL: "300"
-      # CARDDAV_REALTIME: "false"  # Fetch from CardDAV on each LDAP search instead of caching
-      # CARDDAV_HTTP3: "false"  # Enable HTTP/3 (requires curl_cffi)
-      # CARDDAV_FORWARD_REQUESTER: "true"  # Append LDAP requester info to User-Agent (real-time mode)
+      # Account 1 (at least one account required)
+      C2L_ACCOUNT_1_BIND_DN: cn=phone,dc=carddav2ldap,dc=mwllgr,dc=at
+      C2L_ACCOUNT_1_BIND_PASSWORD: secret
+      C2L_ACCOUNT_1_CARDDAV_URL: https://dav.example.com/addressbooks/user/contacts/
+      C2L_ACCOUNT_1_CARDDAV_USERNAME: user@example.com
+      C2L_ACCOUNT_1_CARDDAV_PASSWORD: secret
+
+      # Account 2
+      # C2L_ACCOUNT_2_BIND_DN: cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
+      # C2L_ACCOUNT_2_BIND_PASSWORD: pass2
+      # C2L_ACCOUNT_2_CARDDAV_URL: https://dav.example.com/addressbooks/user2/contacts/
+      # C2L_ACCOUNT_2_CARDDAV_USERNAME: user2
+      # C2L_ACCOUNT_2_CARDDAV_PASSWORD: secret2
+
+      # CardDAV shared defaults (inherited by all accounts)
+      # C2L_CARDDAV_CA_CERT: /certs/ca.crt
+      # C2L_CARDDAV_CLIENT_CERT: /certs/client.crt
+      # C2L_CARDDAV_CLIENT_KEY: /certs/client.key
+      # C2L_CARDDAV_VERIFY_SSL: "true"
+      # C2L_CARDDAV_REFRESH_INTERVAL: "300"
+      # C2L_CARDDAV_REALTIME: "false"
+      # C2L_CARDDAV_HTTP3: "false"
+      # C2L_CARDDAV_FORWARD_REQUESTER: "true"
 
       # LDAP server
-      # LDAP_HOST: 0.0.0.0
-      # LDAP_PORT: "0"  # Auto: 389 for LDAP, 636 for LDAPS
-      # LDAP_BASE_DN: dc=carddav2ldap,dc=mwllgr,dc=at
-      # LDAP_BIND_DN: cn=admin,dc=carddav2ldap,dc=mwllgr,dc=at
-      # LDAP_BIND_PASSWORD: secret
+      # C2L_LDAP_HOST: 0.0.0.0
+      # C2L_LDAP_PORT: "0"  # Auto: 389 for LDAP, 636 for LDAPS
+      # C2L_LDAP_BASE_DN: dc=carddav2ldap,dc=mwllgr,dc=at
 
       # LDAPS / TLS
-      # LDAP_TLS_CERT: /certs/server.crt
-      # LDAP_TLS_KEY: /certs/server.key
+      # C2L_LDAP_TLS_CERT: /certs/server.crt
+      # C2L_LDAP_TLS_KEY: /certs/server.key
 
       # mTLS (LDAP client certificates)
-      # LDAP_TLS_CA: /certs/ca.crt
-      # LDAP_REQUIRE_CLIENT_CERT: "false"
-      # LDAP_ALLOWED_CLIENT_CNS: phone1.example.com,phone2.example.com
-
-      # Multi-user mode (overrides single-user CARDDAV_*/LDAP_BIND_* settings)
-      # ACCOUNT_1_BIND_DN: cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at
-      # ACCOUNT_1_BIND_PASSWORD: pass1
-      # ACCOUNT_1_CARDDAV_URL: https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
-      # ACCOUNT_1_CARDDAV_USERNAME: alice
-      # ACCOUNT_1_CARDDAV_PASSWORD: alices-app-password
-      # ACCOUNT_2_BIND_DN: cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
-      # ACCOUNT_2_BIND_PASSWORD: pass2
-      # ACCOUNT_2_CARDDAV_URL: https://cloud.example.com/remote.php/dav/addressbooks/users/bob/contacts/
-      # ACCOUNT_2_CARDDAV_USERNAME: bob
-      # ACCOUNT_2_CARDDAV_PASSWORD: bobs-app-password
+      # C2L_LDAP_TLS_CA: /certs/ca.crt
+      # C2L_LDAP_REQUIRE_CLIENT_CERT: "false"
+      # C2L_LDAP_ALLOWED_CLIENT_CNS: phone1.example.com,phone2.example.com
     restart: unless-stopped

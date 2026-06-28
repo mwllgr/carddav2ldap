@@ -1,43 +1,18 @@
+# Shared CardDAV defaults (inherited by all accounts, can be overridden per account)
 carddav:
-  url: https://dav.example.com/addressbooks/user/contacts/
-  username: user@example.com
-  password: secret
-
-  # Optional: path to CA certificate bundle for verifying the CardDAV server
   # ca_cert: /path/to/ca-bundle.crt
-
-  # Optional: client certificate for mTLS to the CardDAV server
   # client_cert: /path/to/client.crt
   # client_key: /path/to/client.key
-
-  # Set to false to disable SSL verification (not recommended)
   # verify_ssl: true
-
-  # How often to re-fetch contacts from the CardDAV server (seconds)
-  refresh_interval: 300
-
-  # Real-time mode: fetch contacts from CardDAV on each LDAP search
-  # instead of caching them. Uses CardDAV server-side filtering to
-  # only fetch matching contacts. Disables periodic refresh.
+  # refresh_interval: 300
   # realtime: false
-
-  # Enable HTTP/3 (QUIC) for CardDAV connections.
-  # Requires: pip install carddav-to-ldap[http3]
   # http3: false
-
-  # In real-time mode, append the LDAP requester's bind DN and IP:port
-  # to the User-Agent header sent to the CardDAV server.
-  # Example: carddav-to-ldap.mwllgr.at/0.4.0 @ cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at 192.168.1.4:82842
   # forward_requester: true
 
 ldap:
   host: 0.0.0.0
   # port: auto-detected (389 for LDAP, 636 for LDAPS) — override to set explicitly
   base_dn: dc=carddav2ldap,dc=mwllgr,dc=at
-
-  # Optional: require authentication to search (single-user mode)
-  # bind_dn: cn=admin,dc=carddav2ldap,dc=mwllgr,dc=at
-  # bind_password: secret
 
   # Optional: enable LDAPS (TLS)
   # tls_cert: /path/to/server.crt
@@ -51,6 +26,23 @@ ldap:
   # allowed_client_cns:
   #   - phone1.example.com
   #   - phone2.example.com
+
+# At least one account is required.
+# Each account maps an LDAP bind DN to a CardDAV phonebook.
+accounts:
+  - bind_dn: cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at
+    bind_password: secret1
+    carddav:
+      url: https://dav.example.com/addressbooks/user1/contacts/
+      username: user1
+      password: dav-password1
+  # - bind_dn: cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
+  #   bind_password: secret2
+  #   carddav:
+  #     url: https://dav.example.com/addressbooks/user2/contacts/
+  #     username: user2
+  #     password: dav-password2
+  #     realtime: true  # per-account override
 
 # Map LDAP attributes to vCard properties.
 # Each LDAP attribute maps to a list of vCard property paths.
@@ -73,23 +65,3 @@ attribute_mapping:
   st: [adr.region]
   postalCode: [adr.code]
   c: [adr.country]
-
-# Multi-user mode: different LDAP bind DNs serve different CardDAV phonebooks.
-# Each account has its own bind credentials and CardDAV settings.
-# The top-level carddav section serves as defaults for all accounts.
-# When using accounts, ldap.bind_dn/bind_password are ignored.
-#
-# accounts:
-#   - bind_dn: cn=user1,dc=carddav2ldap,dc=mwllgr,dc=at
-#     bind_password: pass1
-#     carddav:
-#       url: https://dav.example.com/addressbooks/user1/contacts/
-#       username: user1
-#       password: secret1
-#   - bind_dn: cn=user2,dc=carddav2ldap,dc=mwllgr,dc=at
-#     bind_password: pass2
-#     carddav:
-#       url: https://dav.example.com/addressbooks/user2/contacts/
-#       username: user2
-#       password: secret2
-#       realtime: true  # per-account realtime mode

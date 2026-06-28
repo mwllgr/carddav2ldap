@@ -7,8 +7,8 @@ from pathlib import Path
 import yaml
 
 
-ENV_PREFIX_CARDDAV = "CARDDAV_"
-ENV_PREFIX_LDAP = "LDAP_"
+ENV_PREFIX_CARDDAV = "C2L_CARDDAV_"
+ENV_PREFIX_LDAP = "C2L_LDAP_"
 
 
 def _env_override(prefix: str, field_name: str, field_type: type, current: object) -> object:
@@ -59,8 +59,6 @@ class LDAPServerConfig:
     host: str = "0.0.0.0"
     port: int = 0
     base_dn: str = "dc=carddav2ldap,dc=mwllgr,dc=at"
-    bind_dn: str = ""
-    bind_password: str = ""
     tls_cert: str | None = None
     tls_key: str | None = None
     tls_ca: str | None = None
@@ -82,7 +80,7 @@ class LDAPServerConfig:
     def _apply_env(self) -> None:
         for f in dataclasses.fields(self):
             if f.name == "allowed_client_cns":
-                val = os.environ.get("LDAP_ALLOWED_CLIENT_CNS")
+                val = os.environ.get("C2L_LDAP_ALLOWED_CLIENT_CNS")
                 if val is not None:
                     self.allowed_client_cns = [cn.strip() for cn in val.split(",") if cn.strip()]
                 continue
@@ -130,9 +128,15 @@ class Account:
     bind_password: str = ""
     carddav: CardDAVConfig = dataclasses.field(default_factory=CardDAVConfig)
 
+    _NON_INHERITABLE = {"url", "username", "password"}
+
     @classmethod
     def from_dict(cls, d: dict, carddav_defaults: CardDAVConfig) -> Account:
-        default_dict = {f.name: getattr(carddav_defaults, f.name) for f in dataclasses.fields(CardDAVConfig)}
+        default_dict = {
+            f.name: getattr(carddav_defaults, f.name)
+            for f in dataclasses.fields(CardDAVConfig)
+            if f.name not in cls._NON_INHERITABLE
+        }
         merged = {**default_dict, **d.get("carddav", {})}
         carddav = CardDAVConfig.from_dict(merged, apply_env=False)
         return cls(
@@ -159,7 +163,7 @@ _ACCOUNT_CARDDAV_FIELDS: dict[str, str] = {
 
 def _accounts_from_env(carddav_defaults: CardDAVConfig) -> list[Account]:
     indices: set[int] = set()
-    prefix = "ACCOUNT_"
+    prefix = "C2L_ACCOUNT_"
     for key in os.environ:
         if key.startswith(prefix):
             rest = key[len(prefix):]
@@ -189,7 +193,11 @@ def _accounts_from_env(carddav_defaults: CardDAVConfig) -> list[Account]:
                 else:
                     carddav_overrides[field_name] = val
 
-        default_dict = {f.name: getattr(carddav_defaults, f.name) for f in dataclasses.fields(CardDAVConfig)}
+        default_dict = {
+            f.name: getattr(carddav_defaults, f.name)
+            for f in dataclasses.fields(CardDAVConfig)
+            if f.name not in Account._NON_INHERITABLE
+        }
         merged = {**default_dict, **carddav_overrides}
         carddav = CardDAVConfig.from_dict(merged, apply_env=False)
 
@@ -214,11 +222,7 @@ class Config:
         if "accounts" in d:
             accounts = [Account.from_dict(a, carddav) for a in d["accounts"]]
         else:
-            accounts = [Account(
-                bind_dn=ldap.bind_dn,
-                bind_password=ldap.bind_password,
-                carddav=carddav,
-            )]
+            accounts = []
 
         env_accounts = _accounts_from_env(carddav)
         if env_accounts:
