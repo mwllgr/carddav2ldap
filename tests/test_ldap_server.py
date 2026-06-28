@@ -550,6 +550,75 @@ class TestLDAPServerIntegration:
         finally:
             await server.stop()
 
+    async def test_server_dual_tls_and_plaintext(self, tls_certs):
+        handler = LDAPRequestHandler(
+            accounts=[_make_anonymous_account()],
+            base_dn="dc=contacts,dc=local",
+        )
+        ssl_ctx = create_ssl_context(
+            certfile=tls_certs["server_cert"],
+            keyfile=tls_certs["server_key"],
+        )
+        server = LDAPServer(handler, host="127.0.0.1", port=0, ssl_context=ssl_ctx, plaintext_port=0)
+        await server.start()
+        tls_port = server._server.sockets[0].getsockname()[1]
+        assert server._plaintext_server is None
+
+        server2 = LDAPServer(handler, host="127.0.0.1", port=0, ssl_context=ssl_ctx, plaintext_port=0)
+        await server2.start()
+        await server.stop()
+        await server2.stop()
+
+        server3 = LDAPServer(handler, host="127.0.0.1", port=0, ssl_context=ssl_ctx, plaintext_port=0)
+        server3.plaintext_port = 0
+        await server3.start()
+        await server3.stop()
+
+    async def test_server_dual_listener_functional(self, tls_certs):
+        handler = LDAPRequestHandler(
+            accounts=[_make_anonymous_account()],
+            base_dn="dc=contacts,dc=local",
+        )
+        ssl_ctx = create_ssl_context(
+            certfile=tls_certs["server_cert"],
+            keyfile=tls_certs["server_key"],
+        )
+
+        import socket
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        pt_port = s.getsockname()[1]
+        s.close()
+
+        server = LDAPServer(handler, host="127.0.0.1", port=0, ssl_context=ssl_ctx, plaintext_port=pt_port)
+        await server.start()
+        tls_port = server._server.sockets[0].getsockname()[1]
+        assert server._plaintext_server is not None
+
+        try:
+            client_ctx = ssl.create_default_context(cafile=tls_certs["ca_cert"])
+            reader, writer = await asyncio.open_connection("127.0.0.1", tls_port, ssl=client_ctx)
+            writer.write(_build_bind_request(1))
+            await writer.drain()
+            data = await reader.read(4096)
+            parsed = _parse_response(data)
+            assert parsed[0]["op_tag"] == 1
+            assert ber.decode_enumerated(parsed[0]["op"].value[0]) == 0
+            writer.close()
+            await writer.wait_closed()
+
+            reader, writer = await asyncio.open_connection("127.0.0.1", pt_port)
+            writer.write(_build_bind_request(2))
+            await writer.drain()
+            data = await reader.read(4096)
+            parsed = _parse_response(data)
+            assert parsed[0]["op_tag"] == 1
+            assert ber.decode_enumerated(parsed[0]["op"].value[0]) == 0
+            writer.close()
+            await writer.wait_closed()
+        finally:
+            await server.stop()
+
     async def test_server_mtls_wrong_cn_rejected(self, tls_certs):
         handler = LDAPRequestHandler(
             accounts=[_make_anonymous_account()],

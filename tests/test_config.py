@@ -80,6 +80,16 @@ class TestLDAPServerConfig:
         assert cfg.tls_cert is None
         assert cfg.require_client_cert is False
         assert cfg.allowed_client_cns == []
+        assert cfg.plaintext_port == 0
+
+    def test_plaintext_port(self):
+        cfg = LDAPServerConfig.from_dict({"plaintext_port": 389})
+        assert cfg.plaintext_port == 389
+
+    def test_plaintext_port_env(self, monkeypatch):
+        monkeypatch.setenv("C2L_LDAP_PLAINTEXT_PORT", "3389")
+        cfg = LDAPServerConfig.from_dict({})
+        assert cfg.plaintext_port == 3389
 
     def test_effective_port_ldap(self):
         cfg = LDAPServerConfig.from_dict({})

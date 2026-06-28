@@ -3,7 +3,7 @@ services:
     build: .
     ports:
       - "389:389"
-      # - "636:636"  # Use this instead for LDAPS
+      # - "636:636"  # Use this instead (or additionally) for LDAPS
     # volumes:
     #   - ./config.yaml:/app/config.yaml:ro
     #   - ./certs:/certs:ro
@@ -49,4 +49,5 @@ services:
       # C2L_LDAP_TLS_CA: /certs/ca.crt
       # C2L_LDAP_REQUIRE_CLIENT_CERT: "false"
       # C2L_LDAP_ALLOWED_CLIENT_CNS: phone1.example.com,phone2.example.com
+      # C2L_LDAP_PLAINTEXT_PORT: "389"  # Also listen on plaintext when TLS is enabled
     restart: unless-stopped

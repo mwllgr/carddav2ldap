@@ -340,13 +340,16 @@ class LDAPServer:
         port: int = 389,
         ssl_context: ssl.SSLContext | None = None,
         allowed_client_cns: list[str] | None = None,
+        plaintext_port: int = 0,
     ):
         self.handler = handler
         self.host = host
         self.port = port
         self.ssl_context = ssl_context
         self.allowed_client_cns = allowed_client_cns
+        self.plaintext_port = plaintext_port
         self._server: asyncio.AbstractServer | None = None
+        self._plaintext_server: asyncio.AbstractServer | None = None
 
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         peer = writer.get_extra_info("peername", ("unknown",))
@@ -416,16 +419,36 @@ class LDAPServer:
             ssl=self.ssl_context,
         )
         addrs = [s.getsockname() for s in self._server.sockets]
-        logger.info("LDAP server listening on %s", addrs)
+        proto = "LDAPS" if self.ssl_context else "LDAP"
+        logger.info("%s server listening on %s", proto, addrs)
+
+        if self.plaintext_port and self.ssl_context:
+            self._plaintext_server = await asyncio.start_server(
+                self._handle_client,
+                self.host,
+                self.plaintext_port,
+            )
+            pt_addrs = [s.getsockname() for s in self._plaintext_server.sockets]
+            logger.info("LDAP server listening on %s (plaintext)", pt_addrs)
 
     async def serve_forever(self) -> None:
         if self._server is None:
             await self.start()
         assert self._server is not None
-        async with self._server:
-            await self._server.serve_forever()
+        if self._plaintext_server is not None:
+            async with self._server, self._plaintext_server:
+                await asyncio.gather(
+                    self._server.serve_forever(),
+                    self._plaintext_server.serve_forever(),
+                )
+        else:
+            async with self._server:
+                await self._server.serve_forever()
 
     async def stop(self) -> None:
+        if self._plaintext_server:
+            self._plaintext_server.close()
+            await self._plaintext_server.wait_closed()
         if self._server:
             self._server.close()
             await self._server.wait_closed()

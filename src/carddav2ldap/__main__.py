@@ -121,6 +121,7 @@ async def _run(cfg: Config) -> None:
         port=cfg.ldap.effective_port,
         ssl_context=ssl_context,
         allowed_client_cns=allowed_cns,
+        plaintext_port=cfg.ldap.plaintext_port,
     )
 
     loop = asyncio.get_event_loop()

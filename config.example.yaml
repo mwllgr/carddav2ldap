@@ -18,6 +18,9 @@ ldap:
   # tls_cert: /path/to/server.crt
   # tls_key: /path/to/server.key
 
+  # Optional: also listen on a plaintext port (when TLS is enabled)
+  # plaintext_port: 389
+
   # Optional: CA for verifying client certificates (mTLS)
   # tls_ca: /path/to/ca.crt
   # require_client_cert: false

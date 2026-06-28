@@ -130,6 +130,7 @@ The optional top-level `carddav` section (or `C2L_CARDDAV_*` env vars) provides 
 | `ldap.tls_ca` | `C2L_LDAP_TLS_CA` | — | CA certificate for verifying client certs (mTLS) |
 | `ldap.require_client_cert` | `C2L_LDAP_REQUIRE_CLIENT_CERT` | `false` | Require client certificate (mTLS) |
 | `ldap.allowed_client_cns` | `C2L_LDAP_ALLOWED_CLIENT_CNS` | `[]` | Comma-separated list of allowed client cert CNs |
+| `ldap.plaintext_port` | `C2L_LDAP_PLAINTEXT_PORT` | — | Also listen on this port without TLS (when LDAPS is enabled) |
 
 ### Account settings
 
@@ -321,6 +322,15 @@ Set `tls_cert` and `tls_key` to enable LDAPS. The port defaults to 636 when TLS 
 ldap:
   tls_cert: /path/to/server.crt
   tls_key: /path/to/server.key
+```
+
+To serve both LDAPS and plaintext LDAP simultaneously, set `plaintext_port`:
+
+```yaml
+ldap:
+  tls_cert: /path/to/server.crt
+  tls_key: /path/to/server.key
+  plaintext_port: 389  # also listen without TLS on this port
 ```
 
 ### mTLS for LDAP clients

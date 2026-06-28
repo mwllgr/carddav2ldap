@@ -64,6 +64,7 @@ class LDAPServerConfig:
     tls_ca: str | None = None
     require_client_cert: bool = False
     allowed_client_cns: list[str] = dataclasses.field(default_factory=list)
+    plaintext_port: int = 0
 
     @classmethod
     def from_dict(cls, d: dict) -> LDAPServerConfig:
