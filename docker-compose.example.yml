@@ -9,6 +9,9 @@ services:
     #   - ./certs:/certs:ro
     # command: ["/app/config.yaml"]
     environment:
+      # Container user
+      # PUID: "1006"
+
       # CardDAV connection
       CARDDAV_URL: https://dav.example.com/addressbooks/user/contacts/
       CARDDAV_USERNAME: user@example.com

@@ -5,8 +5,13 @@ WORKDIR /app
 COPY pyproject.toml .
 COPY src/ src/
 
-RUN pip install --no-cache-dir .
+RUN apk add --no-cache su-exec && pip install --no-cache-dir .
+
+ENV PUID=1006
+
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 389 636
 
-ENTRYPOINT ["carddav-to-ldap"]
+ENTRYPOINT ["/docker-entrypoint.sh"]

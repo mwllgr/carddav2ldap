@@ -119,6 +119,14 @@ All settings can be provided via a YAML config file, environment variables, or b
 | `ldap.require_client_cert` | `LDAP_REQUIRE_CLIENT_CERT` | `false` | Require client certificate (mTLS) |
 | `ldap.allowed_client_cns` | `LDAP_ALLOWED_CLIENT_CNS` | `[]` | Comma-separated list of allowed client cert CNs |
 
+### Docker settings
+
+| Env var | Default | Description |
+|---|---|---|
+| `PUID` | `1006` | UID of the unprivileged user inside the container |
+
+The container runs rootless by default. The entrypoint creates a user with the given `PUID` and drops privileges before starting the application. Override it to match a host UID if you need access to bind-mounted files (e.g. TLS certificates).
+
 ### Attribute mapping
 
 The `attribute_mapping` section maps LDAP attribute names to vCard property paths. Paths use dot notation for sub-properties and typed values:
