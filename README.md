@@ -10,7 +10,9 @@ Bridge that fetches contacts from a CardDAV server and serves them over LDAP. Us
 - HTTPS with custom CA certificates for CardDAV
 - LDAPS (TLS) for the LDAP server
 - Mutual TLS (mTLS) on both CardDAV and LDAP sides with CN whitelisting
-- Configurable vCard-to-LDAP attribute mapping
+- Simultaneous LDAPS and plaintext LDAP listeners
+- Configurable vCard-to-LDAP attribute mapping with automatic custom-label and related-person support
+- Unmapped vCard properties automatically preserved as `vcfUnmapped*` attributes
 - Per-account LDAP bind DNs serving different CardDAV phonebooks
 - Cached mode with periodic background refresh, or real-time mode with CardDAV server-side filtering per LDAP search
 - Optional LDAP requester forwarding (bind DN + IP) in the User-Agent for real-time searches
@@ -152,7 +154,7 @@ At least one account must be configured via the `accounts` YAML section or `C2L_
 | `accounts[n].carddav.http3` | `C2L_ACCOUNT_<N>_CARDDAV_HTTP3` | inherited | HTTP/3 for this account |
 | `accounts[n].carddav.forward_requester` | `C2L_ACCOUNT_<N>_CARDDAV_FORWARD_REQUESTER` | inherited | Requester forwarding for this account |
 
-Per-account CardDAV settings default to the values from the [CardDAV settings](#carddav-settings-defaults) table above. An account with empty `bind_dn` and `bind_password` allows anonymous LDAP access.
+Per-account CardDAV settings default to the values from the [CardDAV defaults](#carddav-defaults) table above. An account with empty `bind_dn` and `bind_password` allows anonymous LDAP access.
 
 ### Docker settings
 
@@ -172,8 +174,12 @@ The `attribute_mapping` section maps LDAP attribute names to vCard property path
 | `fn` | Full name (FN property) |
 | `n.family` | Family name from N property |
 | `n.given` | Given name from N property |
+| `n.additional` | Middle name from N property |
 | `n.prefix` | Honorific prefix from N property |
 | `n.suffix` | Honorific suffix from N property |
+| `nickname` | Nickname (NICKNAME property) |
+| `x-phonetic-first-name` | Phonetic first name |
+| `x-phonetic-last-name` | Phonetic last name |
 | `email` | All email addresses |
 | `email.work` | Work email addresses (EMAIL with TYPE=WORK) |
 | `email.home` | Home email addresses (EMAIL with TYPE=HOME) |
@@ -183,8 +189,11 @@ The `attribute_mapping` section maps LDAP attribute names to vCard property path
 | `tel.work` | Work phone numbers (TEL with TYPE=WORK) |
 | `tel.fax` | Fax numbers (TEL with TYPE=FAX) |
 | `tel.pager` | Pager numbers (TEL with TYPE=PAGER) |
-| `org` | Organization |
+| `org` | All organization components |
+| `org.name` | Organization name (first ORG component) |
+| `org.department` | Department (second ORG component) |
 | `title` | Job title |
+| `url` | Website URL |
 | `adr.street` | Street address |
 | `adr.city` | City |
 | `adr.region` | State/region |
@@ -192,10 +201,25 @@ The `attribute_mapping` section maps LDAP attribute names to vCard property path
 | `adr.country` | Country |
 | `rev` | Last-modified timestamp (REV property) |
 | `prodid` | Application that created the vCard (PRODID property) |
+| `categories` | Contact categories/tags (CATEGORIES property) |
+| `note` | Notes (NOTE property) |
 | `bday` | Birthday (BDAY property) |
 | `photo` | Contact photo (PHOTO property, base64-encoded if binary) |
 
 The default mapping produces standard `inetOrgPerson` entries. Contacts with multiple phone numbers will have all numbers included in the `telephoneNumber` attribute.
+
+The `cn` attribute is automatically set to `<displayName> (<uid>)` when a UID is present, ensuring unique entries. The original name is stored in `displayName`.
+
+### Related persons
+
+vCard `RELATED` properties are automatically mapped to custom LDAP attributes based on their TYPE:
+
+```
+RELATED;TYPE=spouse;VALUE=text:Jane Doe   →  relatedSpouse: Jane Doe
+RELATED;TYPE=assistant;VALUE=text:Alice    →  relatedAssistant: Alice
+```
+
+Untyped RELATED properties are stored in `relatedPerson`.
 
 ### Custom-labeled properties (X-ABLABEL)
 
@@ -216,6 +240,10 @@ These grouped values are automatically included in the collective attribute (e.g
 | ADR | Vacation Home | `customAddressVacationHome` |
 
 This requires no configuration — it works automatically for all TEL, EMAIL, and ADR properties that have an `X-ABLABEL` group.
+
+### Unmapped properties
+
+Any vCard property not covered by the attribute mapping, related persons, or custom labels is automatically stored as `vcfUnmapped<PropertyName>` in PascalCase. For example, `X-CUSTOM-FIELD` becomes `vcfUnmappedXCustomField`. This ensures no contact data is silently dropped.
 
 Attribute mapping is only configurable via the YAML config file, not via environment variables.
 
@@ -313,7 +341,7 @@ carddav:
 This produces a User-Agent like:
 
 ```
-carddav2ldap.mwllgr.at/0.4.0 (192.168.1.4:82842 - cn=phone1,ou=Users,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at)
+carddav2ldap.mwllgr.at/0.4.0 (192.168.1.4:82842 - cn=phone1,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at)
 ```
 
 Enabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent. Set `forward_requester: false` to disable.

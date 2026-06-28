@@ -54,6 +54,18 @@ def _get_vcard_value(vcard: vobject.base.Component, path: str) -> list[str]:
                     return [val.strip()]
         return []
 
+    if prop_name == "org":
+        field_map = {"name": 0, "department": 1}
+        idx = field_map.get(sub)
+        if idx is not None:
+            for child in matching:
+                val = child.value
+                if isinstance(val, list) and len(val) > idx:
+                    v = val[idx].strip() if isinstance(val[idx], str) else ""
+                    if v:
+                        return [v]
+        return []
+
     if prop_name == "adr":
         field_map = {
             "pobox": "box", "extended": "extended", "street": "street",
@@ -103,15 +115,23 @@ def vcard_to_ldap_entry(
     if not attrs.get("cn"):
         return None
 
-    cn = attrs["cn"][0]
+    display_name = attrs["cn"][0]
+    attrs["displayName"] = [display_name]
+
+    uid_val = attrs.get("uid", [""])[0]
+    cn = f"{display_name} ({uid_val})" if uid_val else display_name
+    attrs["cn"] = [cn]
+
     dn = f"cn={_escape_dn_value(cn)},{base_dn}"
 
     attrs["objectClass"] = ["top", "person", "organizationalPerson", "inetOrgPerson"]
 
     if "sn" not in attrs:
-        attrs["sn"] = [cn.split()[-1] if " " in cn else cn]
+        attrs["sn"] = ["?"]
 
     _apply_labeled_groups(vcard, attrs)
+    _apply_related(vcard, attrs)
+    _apply_unmapped(vcard, attribute_mapping, attrs)
 
     return {"dn": dn, "attributes": attrs}
 
@@ -172,6 +192,61 @@ def _apply_labeled_groups(vcard: vobject.base.Component, attrs: dict[str, list[s
 
         if val:
             attrs.setdefault(attr_name, []).append(val)
+
+
+def _apply_related(vcard: vobject.base.Component, attrs: dict[str, list[str]]) -> None:
+    for child in vcard.getChildren():
+        if child.name.upper() != "RELATED":
+            continue
+        val = child.value if isinstance(child.value, str) else str(child.value)
+        val = val.strip()
+        if not val:
+            continue
+        types = [t.lower() for t in child.params.get("TYPE", [])]
+        types = [t for t in types if t != "text"]
+        if types:
+            for t in types:
+                attr_name = f"related{_to_pascal_case(t)}"
+                attrs.setdefault(attr_name, []).append(val)
+        else:
+            attrs.setdefault("relatedPerson", []).append(val)
+
+
+_SKIP_UNMAPPED = {"VERSION", "FN", "N", "X-ABLABEL", "RELATED"}
+
+
+def _apply_unmapped(
+    vcard: vobject.base.Component,
+    attribute_mapping: dict[str, list[str]],
+    attrs: dict[str, list[str]],
+) -> None:
+    mapped_props: set[str] = set()
+    for vcard_paths in attribute_mapping.values():
+        for path in vcard_paths:
+            mapped_props.add(path.split(".")[0].lower())
+
+    for child in vcard.getChildren():
+        if child.group:
+            continue
+        prop = child.name.upper()
+        if prop in _SKIP_UNMAPPED:
+            continue
+        if child.name.lower() in mapped_props:
+            continue
+
+        attr_name = f"vcfUnmapped{_to_pascal_case(child.name)}"
+        val = child.value
+        if isinstance(val, bytes):
+            text = base64.b64encode(val).decode("ascii")
+        elif isinstance(val, str):
+            text = val.strip()
+        elif isinstance(val, list):
+            text = ", ".join(v.strip() for v in val if isinstance(v, str) and v.strip())
+        else:
+            text = str(val).strip()
+
+        if text:
+            attrs.setdefault(attr_name, []).append(text)
 
 
 def _escape_dn_value(val: str) -> str:

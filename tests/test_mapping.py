@@ -82,7 +82,19 @@ class TestGetVcardValue:
 
     def test_org(self, sample_vcard_text):
         vcard = vobject.readOne(sample_vcard_text)
-        assert _get_vcard_value(vcard, "org") == ["Acme Inc."]
+        assert _get_vcard_value(vcard, "org") == ["Acme Inc.", "Engineering"]
+
+    def test_org_name_sub(self):
+        vcard = vobject.readOne("BEGIN:VCARD\nVERSION:3.0\nFN:X\nORG:Compano;Departo\nEND:VCARD")
+        assert _get_vcard_value(vcard, "org.name") == ["Compano"]
+
+    def test_org_department_sub(self):
+        vcard = vobject.readOne("BEGIN:VCARD\nVERSION:3.0\nFN:X\nORG:Compano;Departo\nEND:VCARD")
+        assert _get_vcard_value(vcard, "org.department") == ["Departo"]
+
+    def test_org_department_missing(self):
+        vcard = vobject.readOne("BEGIN:VCARD\nVERSION:3.0\nFN:X\nORG:Compano\nEND:VCARD")
+        assert _get_vcard_value(vcard, "org.department") == []
 
     def test_title(self, sample_vcard_text):
         vcard = vobject.readOne(sample_vcard_text)
@@ -110,9 +122,11 @@ class TestVcardToLdapEntry:
         vcard = vobject.readOne(sample_vcard_text)
         entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at")
         assert entry is not None
-        assert entry["dn"] == "cn=John Doe,ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at"
+        uid = "42fd302c-d119-476c-b19e-18b8f60d18f1"
+        assert entry["dn"] == f"cn=John Doe ({uid}),ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at"
         attrs = entry["attributes"]
-        assert attrs["cn"] == ["John Doe"]
+        assert attrs["cn"] == [f"John Doe ({uid})"]
+        assert attrs["displayName"] == ["John Doe"]
         assert attrs["sn"] == ["Doe"]
         assert attrs["givenName"] == ["John"]
         assert attrs["mail"] == ["john@example.com", "john.doe@home.example.com"]
@@ -124,20 +138,25 @@ class TestVcardToLdapEntry:
         assert attrs["mobile"] == ["+1-555-0101"]
         assert attrs["homePhone"] == ["+1-555-0102"]
         assert attrs["workPhone"] == ["+1-555-0100"]
+        assert attrs["o"] == ["Acme Inc."]
+        assert attrs["ou"] == ["Engineering"]
+        assert attrs["title"] == ["Engineer"]
         assert "inetOrgPerson" in attrs["objectClass"]
 
-    def test_minimal_contact(self, sample_vcard_minimal):
+    def test_minimal_contact_no_uid(self, sample_vcard_minimal):
         vcard = vobject.readOne(sample_vcard_minimal)
         entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
         assert entry is not None
         assert entry["attributes"]["cn"] == ["Jane Smith"]
-        assert entry["attributes"]["sn"] == ["Smith"]
+        assert entry["attributes"]["displayName"] == ["Jane Smith"]
+        assert entry["attributes"]["sn"] == ["?"]
 
     def test_no_fn_uses_n(self, sample_vcard_no_fn):
         vcard = vobject.readOne(sample_vcard_no_fn)
         entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
         assert entry is not None
         assert entry["attributes"]["cn"] == ["Charlie Brown"]
+        assert entry["attributes"]["displayName"] == ["Charlie Brown"]
 
     def test_completely_empty_vcard(self):
         vcard = vobject.readOne("BEGIN:VCARD\nVERSION:3.0\nEND:VCARD")
@@ -165,7 +184,7 @@ END:VCARD"""
         assert attrs["homePhone"] == ["+1-111-0005"]
 
     def test_custom_mapping(self, sample_vcard_text):
-        mapping = {"displayName": ["fn"], "phone": ["tel.cell"]}
+        mapping = {"cn": ["fn"], "phone": ["tel.cell"]}
         vcard = vobject.readOne(sample_vcard_text)
         entry = vcard_to_ldap_entry(vcard, mapping, "dc=test")
         assert entry is not None
@@ -264,6 +283,173 @@ END:VCARD"""
         assert attrs["customTelephoneBoat"] == ["+1-111-0002"]
         assert "+1-111-0001" in attrs["telephoneNumber"]
         assert "+1-111-0002" in attrs["telephoneNumber"]
+
+
+    def test_org_name_and_department(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Org Person
+ORG:Compano;Departo
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["o"] == ["Compano"]
+        assert entry["attributes"]["ou"] == ["Departo"]
+
+    def test_org_name_only(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Org Person
+ORG:Compano
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["o"] == ["Compano"]
+        assert "ou" not in entry["attributes"]
+
+    def test_nickname(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Jonathan Doe
+NICKNAME:Johnny
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["nickName"] == ["Johnny"]
+
+    def test_url(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Web Person
+URL:https://example.com
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["labeledURI"] == ["https://example.com"]
+
+    def test_phonetic_names(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Test Person
+X-PHONETIC-FIRST-NAME:Yoh-han
+X-PHONETIC-LAST-NAME:Doh
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["phoneticFirstName"] == ["Yoh-han"]
+        assert entry["attributes"]["phoneticLastName"] == ["Doh"]
+
+    def test_related_typed(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Related Person
+RELATED;TYPE=spouse;VALUE=text:Jane Doe
+RELATED;TYPE=assistant;VALUE=text:Alice
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["relatedSpouse"] == ["Jane Doe"]
+        assert entry["attributes"]["relatedAssistant"] == ["Alice"]
+
+    def test_related_multi_type(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Related Person
+RELATED;TYPE=assistant,co-worker;VALUE=text:CoWorkerName
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["relatedAssistant"] == ["CoWorkerName"]
+        assert entry["attributes"]["relatedCoWorker"] == ["CoWorkerName"]
+
+    def test_related_untyped(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Related Person
+RELATED;VALUE=text:Someone
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["relatedPerson"] == ["Someone"]
+
+    def test_cn_includes_uid(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:John Doe
+UID:abc-123
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        assert entry["attributes"]["cn"] == ["John Doe (abc-123)"]
+        assert entry["attributes"]["displayName"] == ["John Doe"]
+        assert entry["dn"] == "cn=John Doe (abc-123),dc=test"
+
+
+    def test_unmapped_properties(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Unmapped Person
+X-CUSTOM-FIELD:custom value
+X-ANOTHER:another value
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        attrs = entry["attributes"]
+        assert attrs["vcfUnmappedXCustomField"] == ["custom value"]
+        assert attrs["vcfUnmappedXAnother"] == ["another value"]
+
+    def test_unmapped_skips_mapped_properties(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Test Person
+TEL:+1-555-0100
+X-WEIRD:weird value
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        attrs = entry["attributes"]
+        assert "vcfUnmappedTel" not in attrs
+        assert "vcfUnmappedFn" not in attrs
+        assert "vcfUnmappedVersion" not in attrs
+        assert attrs["vcfUnmappedXWeird"] == ["weird value"]
+
+    def test_unmapped_skips_grouped_properties(self):
+        vcard_text = """\
+BEGIN:VCARD
+VERSION:3.0
+FN:Test Person
+ITEM1.X-ABLABEL:Custom
+ITEM1.TEL:+1-555-0100
+X-SOLO:solo value
+END:VCARD"""
+        vcard = vobject.readOne(vcard_text)
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=test")
+        assert entry is not None
+        attrs = entry["attributes"]
+        assert "vcfUnmappedXAblabel" not in attrs
+        assert attrs["vcfUnmappedXSolo"] == ["solo value"]
 
 
 class TestToPascalCase:
