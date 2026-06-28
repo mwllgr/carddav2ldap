@@ -76,7 +76,7 @@ class TestLDAPServerConfig:
         assert cfg.host == "0.0.0.0"
         assert cfg.port == 0
         assert cfg.effective_port == 389
-        assert cfg.base_dn == "dc=carddav2ldap,dc=mwllgr,dc=at"
+        assert cfg.base_dn == "ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at"
         assert cfg.tls_cert is None
         assert cfg.require_client_cert is False
         assert cfg.allowed_client_cns == []

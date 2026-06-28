@@ -58,7 +58,7 @@ class CardDAVConfig:
 class LDAPServerConfig:
     host: str = "0.0.0.0"
     port: int = 0
-    base_dn: str = "dc=carddav2ldap,dc=mwllgr,dc=at"
+    base_dn: str = "ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at"
     tls_cert: str | None = None
     tls_key: str | None = None
     tls_ca: str | None = None

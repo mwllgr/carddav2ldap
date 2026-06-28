@@ -36,7 +36,7 @@ See [config.example.yaml](config.example.yaml) for all options.
 ### With environment variables only
 
 ```bash
-export C2L_ACCOUNT_1_BIND_DN=cn=phone,dc=carddav2ldap,dc=mwllgr,dc=at
+export C2L_ACCOUNT_1_BIND_DN=cn=phone,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
 export C2L_ACCOUNT_1_BIND_PASSWORD=secret
 export C2L_ACCOUNT_1_CARDDAV_URL=https://dav.example.com/addressbooks/user/contacts/
 export C2L_ACCOUNT_1_CARDDAV_USERNAME=user@example.com
@@ -50,7 +50,7 @@ carddav-to-ldap
 docker build -t carddav-to-ldap .
 
 docker run -p 389:389 \
-  -e C2L_ACCOUNT_1_BIND_DN=cn=phone,dc=carddav2ldap,dc=mwllgr,dc=at \
+  -e C2L_ACCOUNT_1_BIND_DN=cn=phone,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at \
   -e C2L_ACCOUNT_1_BIND_PASSWORD=secret \
   -e C2L_ACCOUNT_1_CARDDAV_URL=https://dav.example.com/addressbooks/user/contacts/ \
   -e C2L_ACCOUNT_1_CARDDAV_USERNAME=user@example.com \
@@ -71,7 +71,7 @@ docker compose up -d
 The CardDAV URL for Nextcloud follows the pattern `https://<host>/remote.php/dav/addressbooks/users/<username>/<addressbook>/`. The default address book is called `contacts`:
 
 ```bash
-export C2L_ACCOUNT_1_BIND_DN=cn=phone,dc=carddav2ldap,dc=mwllgr,dc=at
+export C2L_ACCOUNT_1_BIND_DN=cn=phone,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
 export C2L_ACCOUNT_1_BIND_PASSWORD=secret
 export C2L_ACCOUNT_1_CARDDAV_URL=https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
 export C2L_ACCOUNT_1_CARDDAV_USERNAME=alice
@@ -83,7 +83,7 @@ Or with a config file:
 
 ```yaml
 accounts:
-  - bind_dn: cn=phone,dc=carddav2ldap,dc=mwllgr,dc=at
+  - bind_dn: cn=phone,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
     bind_password: secret
     carddav:
       url: https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
@@ -124,7 +124,7 @@ The optional top-level `carddav` section (or `C2L_CARDDAV_*` env vars) provides 
 |---|---|---|---|
 | `ldap.host` | `C2L_LDAP_HOST` | `0.0.0.0` | Listen address |
 | `ldap.port` | `C2L_LDAP_PORT` | auto | Listen port (389 for LDAP, 636 when TLS is configured) |
-| `ldap.base_dn` | `C2L_LDAP_BASE_DN` | `dc=carddav2ldap,dc=mwllgr,dc=at` | Base DN for LDAP entries |
+| `ldap.base_dn` | `C2L_LDAP_BASE_DN` | `ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at` | Base DN for LDAP entries |
 | `ldap.tls_cert` | `C2L_LDAP_TLS_CERT` | — | Server certificate for LDAPS |
 | `ldap.tls_key` | `C2L_LDAP_TLS_KEY` | — | Server key for LDAPS |
 | `ldap.tls_ca` | `C2L_LDAP_TLS_CA` | — | CA certificate for verifying client certs (mTLS) |
@@ -199,13 +199,13 @@ carddav:
   refresh_interval: 300
 
 accounts:
-  - bind_dn: cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at
+  - bind_dn: cn=phone1,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
     bind_password: pass1
     carddav:
       url: https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
       username: alice
       password: alices-app-password
-  - bind_dn: cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
+  - bind_dn: cn=phone2,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
     bind_password: pass2
     carddav:
       url: https://cloud.example.com/remote.php/dav/addressbooks/users/bob/contacts/
@@ -225,14 +225,14 @@ Accounts can also be configured via environment variables using the `C2L_ACCOUNT
 export C2L_CARDDAV_VERIFY_SSL=true
 
 # Account 1
-export C2L_ACCOUNT_1_BIND_DN=cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at
+export C2L_ACCOUNT_1_BIND_DN=cn=phone1,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
 export C2L_ACCOUNT_1_BIND_PASSWORD=pass1
 export C2L_ACCOUNT_1_CARDDAV_URL=https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
 export C2L_ACCOUNT_1_CARDDAV_USERNAME=alice
 export C2L_ACCOUNT_1_CARDDAV_PASSWORD=alices-app-password
 
 # Account 2
-export C2L_ACCOUNT_2_BIND_DN=cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
+export C2L_ACCOUNT_2_BIND_DN=cn=phone2,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
 export C2L_ACCOUNT_2_BIND_PASSWORD=pass2
 export C2L_ACCOUNT_2_CARDDAV_URL=https://cloud.example.com/remote.php/dav/addressbooks/users/bob/contacts/
 export C2L_ACCOUNT_2_CARDDAV_USERNAME=bob
@@ -252,7 +252,7 @@ Set `realtime: true` on an account's CardDAV config, or as a shared default:
 
 ```yaml
 accounts:
-  - bind_dn: cn=phone,dc=carddav2ldap,dc=mwllgr,dc=at
+  - bind_dn: cn=phone,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
     bind_password: secret
     carddav:
       url: https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
@@ -283,7 +283,7 @@ carddav:
 This produces a User-Agent like:
 
 ```
-carddav-to-ldap.mwllgr.at/0.4.0 (192.168.1.4:82842 - cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at)
+carddav-to-ldap.mwllgr.at/0.4.0 (192.168.1.4:82842 - cn=phone1,ou=Users,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at)
 ```
 
 Enabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent. Set `forward_requester: false` to disable.

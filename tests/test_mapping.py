@@ -67,9 +67,9 @@ class TestGetVcardValue:
 class TestVcardToLdapEntry:
     def test_full_contact(self, sample_vcard_text):
         vcard = vobject.readOne(sample_vcard_text)
-        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "dc=carddav2ldap,dc=mwllgr,dc=at")
+        entry = vcard_to_ldap_entry(vcard, DEFAULT_ATTRIBUTE_MAPPING, "ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at")
         assert entry is not None
-        assert entry["dn"] == "cn=John Doe,dc=carddav2ldap,dc=mwllgr,dc=at"
+        assert entry["dn"] == "cn=John Doe,ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at"
         attrs = entry["attributes"]
         assert attrs["cn"] == ["John Doe"]
         assert attrs["sn"] == ["Doe"]

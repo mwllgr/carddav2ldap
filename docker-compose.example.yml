@@ -13,14 +13,14 @@ services:
       # C2L_PUID: "1006"
 
       # Account 1 (at least one account required)
-      C2L_ACCOUNT_1_BIND_DN: cn=phone,dc=carddav2ldap,dc=mwllgr,dc=at
+      C2L_ACCOUNT_1_BIND_DN: cn=phone,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
       C2L_ACCOUNT_1_BIND_PASSWORD: secret
       C2L_ACCOUNT_1_CARDDAV_URL: https://dav.example.com/addressbooks/user/contacts/
       C2L_ACCOUNT_1_CARDDAV_USERNAME: user@example.com
       C2L_ACCOUNT_1_CARDDAV_PASSWORD: secret
 
       # Account 2
-      # C2L_ACCOUNT_2_BIND_DN: cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
+      # C2L_ACCOUNT_2_BIND_DN: cn=phone2,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
       # C2L_ACCOUNT_2_BIND_PASSWORD: pass2
       # C2L_ACCOUNT_2_CARDDAV_URL: https://dav.example.com/addressbooks/user2/contacts/
       # C2L_ACCOUNT_2_CARDDAV_USERNAME: user2
@@ -39,7 +39,7 @@ services:
       # LDAP server
       # C2L_LDAP_HOST: 0.0.0.0
       # C2L_LDAP_PORT: "0"  # Auto: 389 for LDAP, 636 for LDAPS
-      # C2L_LDAP_BASE_DN: dc=carddav2ldap,dc=mwllgr,dc=at
+      # C2L_LDAP_BASE_DN: ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at
 
       # LDAPS / TLS
       # C2L_LDAP_TLS_CERT: /certs/server.crt

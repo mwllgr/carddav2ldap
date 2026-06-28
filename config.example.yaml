@@ -12,7 +12,7 @@ carddav:
 ldap:
   host: 0.0.0.0
   # port: auto-detected (389 for LDAP, 636 for LDAPS) — override to set explicitly
-  base_dn: dc=carddav2ldap,dc=mwllgr,dc=at
+  base_dn: ou=Contacts,dc=carddav2ldap,dc=mwllgr,dc=at
 
   # Optional: enable LDAPS (TLS)
   # tls_cert: /path/to/server.crt
@@ -30,13 +30,13 @@ ldap:
 # At least one account is required.
 # Each account maps an LDAP bind DN to a CardDAV phonebook.
 accounts:
-  - bind_dn: cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at
+  - bind_dn: cn=phone1,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
     bind_password: secret1
     carddav:
       url: https://dav.example.com/addressbooks/user1/contacts/
       username: user1
       password: dav-password1
-  # - bind_dn: cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
+  # - bind_dn: cn=phone2,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at
   #   bind_password: secret2
   #   carddav:
   #     url: https://dav.example.com/addressbooks/user2/contacts/
