@@ -21,7 +21,18 @@ class TestGetVcardValue:
 
     def test_email(self, sample_vcard_text):
         vcard = vobject.readOne(sample_vcard_text)
-        assert _get_vcard_value(vcard, "email") == ["john@example.com"]
+        vals = _get_vcard_value(vcard, "email")
+        assert "john@example.com" in vals
+        assert "john.doe@home.example.com" in vals
+        assert len(vals) == 2
+
+    def test_email_work(self, sample_vcard_text):
+        vcard = vobject.readOne(sample_vcard_text)
+        assert _get_vcard_value(vcard, "email.work") == ["john@example.com"]
+
+    def test_email_home(self, sample_vcard_text):
+        vcard = vobject.readOne(sample_vcard_text)
+        assert _get_vcard_value(vcard, "email.home") == ["john.doe@home.example.com"]
 
     def test_tel_all(self, sample_vcard_text):
         vcard = vobject.readOne(sample_vcard_text)
@@ -74,7 +85,9 @@ class TestVcardToLdapEntry:
         assert attrs["cn"] == ["John Doe"]
         assert attrs["sn"] == ["Doe"]
         assert attrs["givenName"] == ["John"]
-        assert attrs["mail"] == ["john@example.com"]
+        assert attrs["mail"] == ["john@example.com", "john.doe@home.example.com"]
+        assert attrs["workEmail"] == ["john@example.com"]
+        assert attrs["homeEmail"] == ["john.doe@home.example.com"]
         assert "+1-555-0100" in attrs["telephoneNumber"]
         assert "+1-555-0101" in attrs["telephoneNumber"]
         assert "+1-555-0102" in attrs["telephoneNumber"]

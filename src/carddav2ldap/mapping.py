@@ -28,7 +28,7 @@ def _get_vcard_value(vcard: vobject.base.Component, path: str) -> list[str]:
 
     sub = parts[1].lower()
 
-    if prop_name == "tel":
+    if prop_name in ("tel", "email"):
         type_map = {"cell": "CELL", "home": "HOME", "work": "WORK"}
         target_type = type_map.get(sub, sub.upper())
         values = []

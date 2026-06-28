@@ -19,7 +19,8 @@ N:Doe;John;;;
 TEL;TYPE=WORK:+1-555-0100
 TEL;TYPE=CELL:+1-555-0101
 TEL;TYPE=HOME:+1-555-0102
-EMAIL:john@example.com
+EMAIL;TYPE=WORK:john@example.com
+EMAIL;TYPE=HOME:john.doe@home.example.com
 ORG:Acme Inc.
 TITLE:Engineer
 ADR;TYPE=WORK:;;123 Main St;Springfield;IL;62701;US

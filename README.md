@@ -171,7 +171,11 @@ The `attribute_mapping` section maps LDAP attribute names to vCard property path
 | `fn` | Full name (FN property) |
 | `n.family` | Family name from N property |
 | `n.given` | Given name from N property |
+| `n.prefix` | Honorific prefix from N property |
+| `n.suffix` | Honorific suffix from N property |
 | `email` | All email addresses |
+| `email.work` | Work email addresses (EMAIL with TYPE=WORK) |
+| `email.home` | Home email addresses (EMAIL with TYPE=HOME) |
 | `tel` | All phone numbers |
 | `tel.cell` | Mobile phone numbers (TEL with TYPE=CELL) |
 | `tel.home` | Home phone numbers (TEL with TYPE=HOME) |
@@ -358,6 +362,13 @@ carddav:
   client_key: /path/to/client.key
   ca_cert: /path/to/ca-bundle.crt
 ```
+
+## Compatibility
+
+Successfully tested with the following devices:
+
+- Grandstream WP826
+- Snom D785
 
 ## Development
 
