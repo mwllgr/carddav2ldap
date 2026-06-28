@@ -1,0 +1,58 @@
+carddav:
+  url: https://dav.example.com/addressbooks/user/contacts/
+  username: user@example.com
+  password: secret
+
+  # Optional: path to CA certificate bundle for verifying the CardDAV server
+  # ca_cert: /path/to/ca-bundle.crt
+
+  # Optional: client certificate for mTLS to the CardDAV server
+  # client_cert: /path/to/client.crt
+  # client_key: /path/to/client.key
+
+  # Set to false to disable SSL verification (not recommended)
+  # verify_ssl: true
+
+  # How often to re-fetch contacts from the CardDAV server (seconds)
+  refresh_interval: 300
+
+ldap:
+  host: 0.0.0.0
+  # port: auto-detected (389 for LDAP, 636 for LDAPS) — override to set explicitly
+  base_dn: dc=carddav2ldap,dc=mwllgr,dc=at
+
+  # Optional: require authentication to search
+  # bind_dn: cn=admin,dc=contacts,dc=local
+  # bind_password: secret
+
+  # Optional: enable LDAPS (TLS)
+  # tls_cert: /path/to/server.crt
+  # tls_key: /path/to/server.key
+
+  # Optional: CA for verifying client certificates (mTLS)
+  # tls_ca: /path/to/ca.crt
+  # require_client_cert: false
+
+  # Optional: whitelist of allowed client certificate CNs
+  # allowed_client_cns:
+  #   - phone1.example.com
+  #   - phone2.example.com
+
+# Map LDAP attributes to vCard properties.
+# Each LDAP attribute maps to a list of vCard property paths.
+# Paths use dot notation: "tel.cell" = TEL with TYPE=CELL.
+attribute_mapping:
+  cn: [fn]
+  sn: [n.family]
+  givenName: [n.given]
+  mail: [email]
+  telephoneNumber: [tel]
+  mobile: [tel.cell]
+  homePhone: [tel.home]
+  title: [title]
+  o: [org]
+  street: [adr.street]
+  l: [adr.city]
+  st: [adr.region]
+  postalCode: [adr.code]
+  c: [adr.country]

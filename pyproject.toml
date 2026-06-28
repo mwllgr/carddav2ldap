@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "carddav-to-ldap"
+version = "0.1.0"
+description = "Bridge CardDAV contacts to an LDAP server for IP phones and other LDAP-only clients"
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+    "vobject>=0.9.7",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+carddav-to-ldap = "carddav_to_ldap.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23",
+]

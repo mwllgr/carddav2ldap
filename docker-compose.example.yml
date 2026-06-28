@@ -1,0 +1,26 @@
+services:
+  carddav-to-ldap:
+    build: .
+    ports:
+      - "389:389"
+    environment:
+      CARDDAV_URL: https://dav.example.com/addressbooks/user/contacts/
+      CARDDAV_USERNAME: user@example.com
+      CARDDAV_PASSWORD: secret
+      CARDDAV_REFRESH_INTERVAL: "300"
+      LDAP_BASE_DN: dc=carddav2ldap,dc=mwllgr,dc=at
+    restart: unless-stopped
+
+  # Example with LDAPS and a config file
+  # carddav-to-ldap-tls:
+  #   build: .
+  #   ports:
+  #     - "636:636"
+  #   volumes:
+  #     - ./config.yaml:/app/config.yaml:ro
+  #     - ./certs:/certs:ro
+  #   command: ["/app/config.yaml"]
+  #   environment:
+  #     LDAP_TLS_CERT: /certs/server.crt
+  #     LDAP_TLS_KEY: /certs/server.key
+  #   restart: unless-stopped
