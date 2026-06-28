@@ -51,15 +51,13 @@ carddav2ldap
 ### With Docker
 
 ```bash
-docker build -t carddav2ldap .
-
 docker run -p 389:389 \
   -e C2L_ACCOUNT_1_BIND_DN=cn=phone,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at \
   -e C2L_ACCOUNT_1_BIND_PASSWORD=secret \
   -e C2L_ACCOUNT_1_CARDDAV_URL=https://dav.example.com/addressbooks/user/contacts/ \
   -e C2L_ACCOUNT_1_CARDDAV_USERNAME=user@example.com \
   -e C2L_ACCOUNT_1_CARDDAV_PASSWORD=secret \
-  carddav2ldap
+  ghcr.io/mwllgr/carddav2ldap
 ```
 
 Or use the example Compose file:

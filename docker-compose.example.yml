@@ -1,6 +1,6 @@
 services:
   carddav2ldap:
-    build: .
+    image: ghcr.io/mwllgr/carddav2ldap
     ports:
       - "389:389"
       # - "636:636"  # Use this instead (or additionally) for LDAPS
