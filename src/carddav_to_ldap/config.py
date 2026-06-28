@@ -142,6 +142,62 @@ class Account:
         )
 
 
+_ACCOUNT_CARDDAV_FIELDS: dict[str, str] = {
+    "URL": "url",
+    "USERNAME": "username",
+    "PASSWORD": "password",
+    "CA_CERT": "ca_cert",
+    "CLIENT_CERT": "client_cert",
+    "CLIENT_KEY": "client_key",
+    "VERIFY_SSL": "verify_ssl",
+    "REFRESH_INTERVAL": "refresh_interval",
+    "REALTIME": "realtime",
+    "HTTP3": "http3",
+    "FORWARD_REQUESTER": "forward_requester",
+}
+
+
+def _accounts_from_env(carddav_defaults: CardDAVConfig) -> list[Account]:
+    indices: set[int] = set()
+    prefix = "ACCOUNT_"
+    for key in os.environ:
+        if key.startswith(prefix):
+            rest = key[len(prefix):]
+            parts = rest.split("_", 1)
+            if parts[0].isdigit():
+                indices.add(int(parts[0]))
+
+    if not indices:
+        return []
+
+    accounts: list[Account] = []
+    for idx in sorted(indices):
+        p = f"{prefix}{idx}_"
+        bind_dn = os.environ.get(f"{p}BIND_DN", "")
+        bind_password = os.environ.get(f"{p}BIND_PASSWORD", "")
+
+        carddav_overrides: dict = {}
+        carddav_field_types = {f.name: _unwrap_optional(f.type) for f in dataclasses.fields(CardDAVConfig)}
+        for env_suffix, field_name in _ACCOUNT_CARDDAV_FIELDS.items():
+            val = os.environ.get(f"{p}CARDDAV_{env_suffix}")
+            if val is not None:
+                ft = carddav_field_types.get(field_name, str)
+                if ft is bool:
+                    carddav_overrides[field_name] = val.lower() in ("1", "true", "yes")
+                elif ft is int:
+                    carddav_overrides[field_name] = int(val)
+                else:
+                    carddav_overrides[field_name] = val
+
+        default_dict = {f.name: getattr(carddav_defaults, f.name) for f in dataclasses.fields(CardDAVConfig)}
+        merged = {**default_dict, **carddav_overrides}
+        carddav = CardDAVConfig.from_dict(merged, apply_env=False)
+
+        accounts.append(Account(bind_dn=bind_dn, bind_password=bind_password, carddav=carddav))
+
+    return accounts
+
+
 @dataclasses.dataclass
 class Config:
     carddav: CardDAVConfig
@@ -163,6 +219,10 @@ class Config:
                 bind_password=ldap.bind_password,
                 carddav=carddav,
             )]
+
+        env_accounts = _accounts_from_env(carddav)
+        if env_accounts:
+            accounts = env_accounts
 
         return cls(carddav=carddav, ldap=ldap, attribute_mapping=mapping, accounts=accounts)
 

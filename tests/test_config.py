@@ -245,3 +245,80 @@ class TestConfig:
         })
         assert cfg.accounts[0].carddav.verify_ssl is False
         assert cfg.accounts[0].carddav.refresh_interval == 60
+
+    def test_accounts_from_env(self, monkeypatch):
+        monkeypatch.setenv("ACCOUNT_1_BIND_DN", "cn=phone1")
+        monkeypatch.setenv("ACCOUNT_1_BIND_PASSWORD", "pass1")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_URL", "https://dav1.example.com/")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_USERNAME", "user1")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_PASSWORD", "secret1")
+        monkeypatch.setenv("ACCOUNT_2_BIND_DN", "cn=phone2")
+        monkeypatch.setenv("ACCOUNT_2_BIND_PASSWORD", "pass2")
+        monkeypatch.setenv("ACCOUNT_2_CARDDAV_URL", "https://dav2.example.com/")
+        cfg = Config.from_env()
+        assert len(cfg.accounts) == 2
+        assert cfg.accounts[0].bind_dn == "cn=phone1"
+        assert cfg.accounts[0].bind_password == "pass1"
+        assert cfg.accounts[0].carddav.url == "https://dav1.example.com/"
+        assert cfg.accounts[0].carddav.username == "user1"
+        assert cfg.accounts[1].bind_dn == "cn=phone2"
+        assert cfg.accounts[1].carddav.url == "https://dav2.example.com/"
+
+    def test_env_accounts_inherit_carddav_defaults(self, monkeypatch):
+        monkeypatch.setenv("CARDDAV_VERIFY_SSL", "false")
+        monkeypatch.setenv("CARDDAV_REFRESH_INTERVAL", "120")
+        monkeypatch.setenv("ACCOUNT_1_BIND_DN", "cn=phone1")
+        monkeypatch.setenv("ACCOUNT_1_BIND_PASSWORD", "pass1")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_URL", "https://dav1.example.com/")
+        cfg = Config.from_env()
+        assert len(cfg.accounts) == 1
+        assert cfg.accounts[0].carddav.verify_ssl is False
+        assert cfg.accounts[0].carddav.refresh_interval == 120
+        assert cfg.accounts[0].carddav.url == "https://dav1.example.com/"
+
+    def test_env_accounts_override_carddav_defaults(self, monkeypatch):
+        monkeypatch.setenv("CARDDAV_REFRESH_INTERVAL", "300")
+        monkeypatch.setenv("ACCOUNT_1_BIND_DN", "cn=phone1")
+        monkeypatch.setenv("ACCOUNT_1_BIND_PASSWORD", "pass1")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_URL", "https://dav1.example.com/")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_REFRESH_INTERVAL", "60")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_REALTIME", "true")
+        cfg = Config.from_env()
+        assert cfg.accounts[0].carddav.refresh_interval == 60
+        assert cfg.accounts[0].carddav.realtime is True
+
+    def test_env_accounts_override_yaml_accounts(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("ACCOUNT_1_BIND_DN", "cn=env-user")
+        monkeypatch.setenv("ACCOUNT_1_BIND_PASSWORD", "envpass")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_URL", "https://env.example.com/")
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.dump({
+            "carddav": {"url": "https://yaml.example.com/"},
+            "ldap": {"bind_dn": "cn=yaml-user", "bind_password": "yamlpass"},
+        }))
+        cfg = Config.from_yaml(config_file)
+        assert len(cfg.accounts) == 1
+        assert cfg.accounts[0].bind_dn == "cn=env-user"
+        assert cfg.accounts[0].carddav.url == "https://env.example.com/"
+
+    def test_no_env_accounts_preserves_yaml(self, tmp_path):
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text(yaml.dump({
+            "carddav": {"url": "https://yaml.example.com/"},
+            "ldap": {"bind_dn": "cn=yaml-user", "bind_password": "yamlpass"},
+        }))
+        cfg = Config.from_yaml(config_file)
+        assert len(cfg.accounts) == 1
+        assert cfg.accounts[0].bind_dn == "cn=yaml-user"
+
+    def test_env_accounts_numbering_gaps(self, monkeypatch):
+        monkeypatch.setenv("ACCOUNT_1_BIND_DN", "cn=first")
+        monkeypatch.setenv("ACCOUNT_1_BIND_PASSWORD", "p1")
+        monkeypatch.setenv("ACCOUNT_1_CARDDAV_URL", "https://a.com/")
+        monkeypatch.setenv("ACCOUNT_5_BIND_DN", "cn=fifth")
+        monkeypatch.setenv("ACCOUNT_5_BIND_PASSWORD", "p5")
+        monkeypatch.setenv("ACCOUNT_5_CARDDAV_URL", "https://b.com/")
+        cfg = Config.from_env()
+        assert len(cfg.accounts) == 2
+        assert cfg.accounts[0].bind_dn == "cn=first"
+        assert cfg.accounts[1].bind_dn == "cn=fifth"

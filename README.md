@@ -190,7 +190,33 @@ When `accounts` is present, `ldap.bind_dn` / `ldap.bind_password` are ignored. W
 
 An account with empty `bind_dn` and `bind_password` allows anonymous access. If no anonymous account is defined, unauthenticated clients are rejected.
 
-Multi-user mode is only configurable via the YAML config file, not via environment variables.
+### Multi-user via environment variables
+
+Accounts can also be configured via environment variables using the `ACCOUNT_<N>_` prefix. The top-level `CARDDAV_*` vars serve as defaults:
+
+```bash
+# Defaults inherited by all accounts
+export CARDDAV_VERIFY_SSL=true
+
+# Account 1
+export ACCOUNT_1_BIND_DN=cn=phone1,dc=carddav2ldap,dc=mwllgr,dc=at
+export ACCOUNT_1_BIND_PASSWORD=pass1
+export ACCOUNT_1_CARDDAV_URL=https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
+export ACCOUNT_1_CARDDAV_USERNAME=alice
+export ACCOUNT_1_CARDDAV_PASSWORD=alices-app-password
+
+# Account 2
+export ACCOUNT_2_BIND_DN=cn=phone2,dc=carddav2ldap,dc=mwllgr,dc=at
+export ACCOUNT_2_BIND_PASSWORD=pass2
+export ACCOUNT_2_CARDDAV_URL=https://cloud.example.com/remote.php/dav/addressbooks/users/bob/contacts/
+export ACCOUNT_2_CARDDAV_USERNAME=bob
+export ACCOUNT_2_CARDDAV_PASSWORD=bobs-app-password
+export ACCOUNT_2_CARDDAV_REALTIME=true
+```
+
+Account numbers don't need to be sequential. When `ACCOUNT_*` env vars are present, they override any YAML-defined accounts.
+
+Available per-account env vars: `ACCOUNT_<N>_BIND_DN`, `ACCOUNT_<N>_BIND_PASSWORD`, `ACCOUNT_<N>_CARDDAV_URL`, `ACCOUNT_<N>_CARDDAV_USERNAME`, `ACCOUNT_<N>_CARDDAV_PASSWORD`, `ACCOUNT_<N>_CARDDAV_CA_CERT`, `ACCOUNT_<N>_CARDDAV_CLIENT_CERT`, `ACCOUNT_<N>_CARDDAV_CLIENT_KEY`, `ACCOUNT_<N>_CARDDAV_VERIFY_SSL`, `ACCOUNT_<N>_CARDDAV_REFRESH_INTERVAL`, `ACCOUNT_<N>_CARDDAV_REALTIME`, `ACCOUNT_<N>_CARDDAV_HTTP3`, `ACCOUNT_<N>_CARDDAV_FORWARD_REQUESTER`.
 
 ## Real-time mode
 
