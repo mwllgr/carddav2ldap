@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Bridge CardDAV contacts to an LDAP server for IP phones and other LDAP-only clients"
 requires-python = ">=3.11"
 dependencies = [
-    "requests>=2.31",
+    "httpx[http2]>=0.27",
     "vobject>=0.9.7",
     "pyyaml>=6.0",
 ]

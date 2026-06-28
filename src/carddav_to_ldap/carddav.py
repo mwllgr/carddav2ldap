@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
+import ssl
 from importlib.metadata import version, PackageNotFoundError
 import xml.etree.ElementTree as ET
 
-import requests
+import httpx
 import vobject
 
 from .config import CardDAVConfig
@@ -21,20 +22,34 @@ DAV_NS = "DAV:"
 CARDDAV_NS = "urn:ietf:params:xml:ns:carddav"
 
 
-def _build_session(cfg: CardDAVConfig) -> requests.Session:
-    session = requests.Session()
-    session.headers["User-Agent"] = USER_AGENT
-    if cfg.username:
-        session.auth = (cfg.username, cfg.password)
-    if cfg.client_cert and cfg.client_key:
-        session.cert = (cfg.client_cert, cfg.client_key)
-    elif cfg.client_cert:
-        session.cert = cfg.client_cert
+def _build_client(cfg: CardDAVConfig) -> httpx.Client:
+    verify: ssl.SSLContext | bool = True
     if cfg.ca_cert:
-        session.verify = cfg.ca_cert
+        verify = ssl.create_default_context(cafile=cfg.ca_cert)
     elif not cfg.verify_ssl:
-        session.verify = False
-    return session
+        verify = False
+
+    cert: tuple[str, str] | tuple[str] | None = None
+    if cfg.client_cert and cfg.client_key:
+        cert = (cfg.client_cert, cfg.client_key)
+    elif cfg.client_cert:
+        cert = (cfg.client_cert,)
+
+    if isinstance(verify, ssl.SSLContext) and cert:
+        verify.load_cert_chain(cert[0], cert[1] if len(cert) > 1 else None)
+        cert = None
+
+    auth: tuple[str, str] | None = None
+    if cfg.username:
+        auth = (cfg.username, cfg.password)
+
+    return httpx.Client(
+        http2=True,
+        verify=verify,
+        cert=cert,
+        auth=auth,
+        headers={"User-Agent": USER_AGENT},
+    )
 
 
 ADDRESSBOOK_MULTIGET_BODY = """\
@@ -57,8 +72,8 @@ PROPFIND_BODY = """\
 </d:propfind>"""
 
 
-def _discover_vcards(session: requests.Session, url: str) -> list[str]:
-    resp = session.request("PROPFIND", url, data=PROPFIND_BODY, headers={
+def _discover_vcards(client: httpx.Client, url: str) -> list[str]:
+    resp = client.request("PROPFIND", url, content=PROPFIND_BODY, headers={
         "Content-Type": "application/xml; charset=utf-8",
         "Depth": "1",
     })
@@ -75,14 +90,14 @@ def _discover_vcards(session: requests.Session, url: str) -> list[str]:
     return hrefs
 
 
-def _fetch_vcards(session: requests.Session, url: str, hrefs: list[str]) -> list[vobject.base.Component]:
+def _fetch_vcards(client: httpx.Client, url: str, hrefs: list[str]) -> list[vobject.base.Component]:
     if not hrefs:
         return []
 
     href_xml = "\n".join(f'  <d:href>{h}</d:href>' for h in hrefs)
     body = ADDRESSBOOK_MULTIGET_BODY.format(hrefs=href_xml)
 
-    resp = session.request("REPORT", url, data=body, headers={
+    resp = client.request("REPORT", url, content=body, headers={
         "Content-Type": "application/xml; charset=utf-8",
         "Depth": "1",
     })
@@ -101,10 +116,10 @@ def _fetch_vcards(session: requests.Session, url: str, hrefs: list[str]) -> list
 
 
 def fetch_contacts(cfg: CardDAVConfig) -> list[vobject.base.Component]:
-    session = _build_session(cfg)
-    hrefs = _discover_vcards(session, cfg.url)
+    client = _build_client(cfg)
+    hrefs = _discover_vcards(client, cfg.url)
     logger.info("Discovered %d vCard resources", len(hrefs))
-    return _fetch_vcards(session, cfg.url, hrefs)
+    return _fetch_vcards(client, cfg.url, hrefs)
 
 
 LDAP_ATTR_TO_VCARD_PROPS: dict[str, list[str]] = {
@@ -165,13 +180,13 @@ def build_carddav_filter(terms: list[tuple[str, str]]) -> str:
 
 
 def search_contacts(cfg: CardDAVConfig, terms: list[tuple[str, str]]) -> list[vobject.base.Component]:
-    session = _build_session(cfg)
+    client = _build_client(cfg)
     carddav_filter = build_carddav_filter(terms)
     body = ADDRESSBOOK_QUERY_BODY.format(filter=carddav_filter)
 
     logger.debug("CardDAV addressbook-query with %d filter terms", len(terms))
 
-    resp = session.request("REPORT", cfg.url, data=body, headers={
+    resp = client.request("REPORT", cfg.url, content=body, headers={
         "Content-Type": "application/xml; charset=utf-8",
         "Depth": "1",
     })

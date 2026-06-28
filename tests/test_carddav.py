@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
-from http.server import HTTPServer, BaseHTTPRequestHandler
-import threading
 import ssl
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from carddav_to_ldap.carddav import (
-    _build_session, _discover_vcards, _fetch_vcards, fetch_contacts,
+    _build_client, _discover_vcards, _fetch_vcards, fetch_contacts,
     build_carddav_filter, search_contacts,
 )
 from carddav_to_ldap.config import CardDAVConfig
@@ -82,61 +80,62 @@ END:VCARD</c:address-data>
 </d:multistatus>"""
 
 
-class TestBuildSession:
+class TestBuildClient:
     def test_basic_auth(self):
         cfg = CardDAVConfig(url="https://x.com/", username="user", password="pass")
-        session = _build_session(cfg)
-        assert session.auth == ("user", "pass")
+        client = _build_client(cfg)
+        assert client._auth is not None
 
     def test_no_auth(self):
         cfg = CardDAVConfig(url="https://x.com/")
-        session = _build_session(cfg)
-        assert session.auth is None
-
-    def test_client_cert(self):
-        cfg = CardDAVConfig(
-            url="https://x.com/",
-            client_cert="/cert.pem",
-            client_key="/key.pem",
-        )
-        session = _build_session(cfg)
-        assert session.cert == ("/cert.pem", "/key.pem")
-
-    def test_ca_cert(self):
-        cfg = CardDAVConfig(url="https://x.com/", ca_cert="/ca.pem")
-        session = _build_session(cfg)
-        assert session.verify == "/ca.pem"
+        client = _build_client(cfg)
+        assert client._auth is None
 
     def test_no_verify(self):
         cfg = CardDAVConfig(url="https://x.com/", verify_ssl=False)
-        session = _build_session(cfg)
-        assert session.verify is False
+        client = _build_client(cfg)
+        assert client._transport._pool._ssl_context.verify_mode == ssl.CERT_NONE
 
     def test_default_verify(self):
         cfg = CardDAVConfig(url="https://x.com/")
-        session = _build_session(cfg)
-        assert session.verify is True
+        client = _build_client(cfg)
+        assert client._transport._pool._ssl_context.verify_mode == ssl.CERT_REQUIRED
+
+    def test_http2_enabled(self):
+        cfg = CardDAVConfig(url="https://x.com/")
+        client = _build_client(cfg)
+        assert client._transport._pool._http2
+
+    def test_user_agent(self):
+        cfg = CardDAVConfig(url="https://x.com/")
+        client = _build_client(cfg)
+        assert "carddav-to-ldap.mwllgr.at/" in client.headers["user-agent"]
+
+    def test_ca_cert(self, tls_certs):
+        cfg = CardDAVConfig(url="https://x.com/", ca_cert=tls_certs["ca_cert"])
+        client = _build_client(cfg)
+        assert isinstance(client._transport._pool._ssl_context, ssl.SSLContext)
 
 
 class TestDiscoverVcards:
     def test_discover(self):
-        mock_session = MagicMock()
+        mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.text = PROPFIND_RESPONSE
         mock_response.raise_for_status = MagicMock()
-        mock_session.request.return_value = mock_response
+        mock_client.request.return_value = mock_response
 
-        hrefs = _discover_vcards(mock_session, "https://dav.example.com/contacts/")
+        hrefs = _discover_vcards(mock_client, "https://dav.example.com/contacts/")
         assert len(hrefs) == 2
         assert "/contacts/john.vcf" in hrefs
         assert "/contacts/jane.vcf" in hrefs
-        mock_session.request.assert_called_once()
-        call_args = mock_session.request.call_args
+        mock_client.request.assert_called_once()
+        call_args = mock_client.request.call_args
         assert call_args[0][0] == "PROPFIND"
         assert call_args[0][1] == "https://dav.example.com/contacts/"
 
     def test_discover_no_vcf(self):
-        mock_session = MagicMock()
+        mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.text = """\
 <?xml version="1.0"?>
@@ -146,22 +145,22 @@ class TestDiscoverVcards:
   </d:response>
 </d:multistatus>"""
         mock_response.raise_for_status = MagicMock()
-        mock_session.request.return_value = mock_response
+        mock_client.request.return_value = mock_response
 
-        hrefs = _discover_vcards(mock_session, "https://x.com/")
+        hrefs = _discover_vcards(mock_client, "https://x.com/")
         assert hrefs == []
 
 
 class TestFetchVcards:
     def test_fetch(self):
-        mock_session = MagicMock()
+        mock_client = MagicMock()
         mock_response = MagicMock()
         mock_response.text = REPORT_RESPONSE
         mock_response.raise_for_status = MagicMock()
-        mock_session.request.return_value = mock_response
+        mock_client.request.return_value = mock_response
 
         contacts = _fetch_vcards(
-            mock_session,
+            mock_client,
             "https://dav.example.com/contacts/",
             ["/contacts/john.vcf", "/contacts/jane.vcf"],
         )
@@ -170,19 +169,19 @@ class TestFetchVcards:
         assert contacts[1].fn.value == "Jane Smith"
 
     def test_fetch_empty(self):
-        mock_session = MagicMock()
-        contacts = _fetch_vcards(mock_session, "https://x.com/", [])
+        mock_client = MagicMock()
+        contacts = _fetch_vcards(mock_client, "https://x.com/", [])
         assert contacts == []
-        mock_session.request.assert_not_called()
+        mock_client.request.assert_not_called()
 
 
 class TestFetchContacts:
     @patch("carddav_to_ldap.carddav._fetch_vcards")
     @patch("carddav_to_ldap.carddav._discover_vcards")
-    @patch("carddav_to_ldap.carddav._build_session")
+    @patch("carddav_to_ldap.carddav._build_client")
     def test_integration(self, mock_build, mock_discover, mock_fetch):
-        mock_session = MagicMock()
-        mock_build.return_value = mock_session
+        mock_client = MagicMock()
+        mock_build.return_value = mock_client
         mock_discover.return_value = ["/john.vcf"]
         mock_fetch.return_value = [MagicMock()]
 
@@ -191,8 +190,8 @@ class TestFetchContacts:
 
         assert len(result) == 1
         mock_build.assert_called_once_with(cfg)
-        mock_discover.assert_called_once_with(mock_session, cfg.url)
-        mock_fetch.assert_called_once_with(mock_session, cfg.url, ["/john.vcf"])
+        mock_discover.assert_called_once_with(mock_client, cfg.url)
+        mock_fetch.assert_called_once_with(mock_client, cfg.url, ["/john.vcf"])
 
 
 class TestBuildCardDAVFilter:
@@ -232,51 +231,38 @@ class TestBuildCardDAVFilter:
 
 
 class TestSearchContacts:
-    @patch("carddav_to_ldap.carddav._build_session")
+    @patch("carddav_to_ldap.carddav._build_client")
     def test_search_sends_report(self, mock_build):
-        mock_session = MagicMock()
-        mock_build.return_value = mock_session
+        mock_client = MagicMock()
+        mock_build.return_value = mock_client
         mock_response = MagicMock()
         mock_response.text = REPORT_RESPONSE
         mock_response.raise_for_status = MagicMock()
-        mock_session.request.return_value = mock_response
+        mock_client.request.return_value = mock_response
 
         cfg = CardDAVConfig(url="https://dav.example.com/contacts/")
         result = search_contacts(cfg, [("cn", "John")])
 
         assert len(result) == 2
-        call_args = mock_session.request.call_args
+        call_args = mock_client.request.call_args
         assert call_args[0][0] == "REPORT"
-        body = call_args[1].get("data") or call_args[0][2]
+        body = call_args[1].get("content") or call_args[0][2]
         assert "addressbook-query" in body
         assert "prop-filter" in body
 
-    @patch("carddav_to_ldap.carddav._build_session")
+    @patch("carddav_to_ldap.carddav._build_client")
     def test_search_empty_terms_fetches_all(self, mock_build):
-        mock_session = MagicMock()
-        mock_build.return_value = mock_session
+        mock_client = MagicMock()
+        mock_build.return_value = mock_client
         mock_response = MagicMock()
         mock_response.text = REPORT_RESPONSE
         mock_response.raise_for_status = MagicMock()
-        mock_session.request.return_value = mock_response
+        mock_client.request.return_value = mock_response
 
         cfg = CardDAVConfig(url="https://dav.example.com/contacts/")
         result = search_contacts(cfg, [])
 
         assert len(result) == 2
-        call_args = mock_session.request.call_args
-        body = call_args[1].get("data") or call_args[0][2]
+        call_args = mock_client.request.call_args
+        body = call_args[1].get("content") or call_args[0][2]
         assert "prop-filter" not in body
-
-
-class TestCardDAVWithTLS:
-    def test_session_with_mtls_config(self):
-        cfg = CardDAVConfig(
-            url="https://secure.example.com/",
-            client_cert="/path/to/cert.pem",
-            client_key="/path/to/key.pem",
-            ca_cert="/path/to/ca.pem",
-        )
-        session = _build_session(cfg)
-        assert session.cert == ("/path/to/cert.pem", "/path/to/key.pem")
-        assert session.verify == "/path/to/ca.pem"
