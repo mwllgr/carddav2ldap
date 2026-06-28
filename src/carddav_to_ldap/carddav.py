@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import logging
+from importlib.metadata import version, PackageNotFoundError
 import xml.etree.ElementTree as ET
 
 import requests
 import vobject
 
 from .config import CardDAVConfig
+
+try:
+    _VERSION = version("carddav-to-ldap")
+except PackageNotFoundError:
+    _VERSION = "unknown"
+USER_AGENT = f"carddav-to-ldap.mwllgr.at/{_VERSION}"
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +23,7 @@ CARDDAV_NS = "urn:ietf:params:xml:ns:carddav"
 
 def _build_session(cfg: CardDAVConfig) -> requests.Session:
     session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
     if cfg.username:
         session.auth = (cfg.username, cfg.password)
     if cfg.client_cert and cfg.client_key:

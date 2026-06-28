@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "carddav-to-ldap"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Bridge CardDAV contacts to an LDAP server for IP phones and other LDAP-only clients"
 requires-python = ">=3.11"
 dependencies = [
@@ -15,6 +15,9 @@ dependencies = [
 
 [project.scripts]
 carddav-to-ldap = "carddav_to_ldap.__main__:main"
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION.txt"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
