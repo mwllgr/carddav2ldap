@@ -215,6 +215,15 @@ class LDAPRequestHandler:
         scope = req["scope"]  # 0=base, 1=oneLevel, 2=subtree
 
         if scope == 0:
+            for entry in self.entries:
+                if entry["dn"].lower() == base:
+                    attrs = {k.lower(): v for k, v in entry["attributes"].items()}
+                    if _parse_filter(req["filter"], attrs):
+                        filtered = _filter_attributes(entry["attributes"], req["attributes"])
+                        return [
+                            _build_search_result_entry(message_id, entry["dn"], filtered),
+                            _build_search_result_done(message_id, LDAP_SUCCESS),
+                        ]
             return [_build_search_result_done(message_id, LDAP_SUCCESS)]
 
         if scope == 1 and base != self.base_dn:

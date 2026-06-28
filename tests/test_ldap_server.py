@@ -285,7 +285,7 @@ class TestLDAPRequestHandler:
         responses = self.handler.handle_message(msg)
         assert responses == []
 
-    def test_search_base_scope_returns_nothing(self):
+    def test_search_base_scope_on_base_dn_returns_nothing(self):
         req = _build_search_request(12, base_dn="dc=contacts,dc=local", scope=0)
         msg, _ = ber.read_ldap_message(req)
         responses = self.handler.handle_message(msg)
@@ -294,6 +294,16 @@ class TestLDAPRequestHandler:
             all_parsed.extend(_parse_response(r))
         entries = [p for p in all_parsed if p["op_tag"] == 4]
         assert len(entries) == 0
+
+    def test_search_base_scope_on_entry_returns_that_entry(self):
+        req = _build_search_request(19, base_dn="cn=John Doe,dc=contacts,dc=local", scope=0)
+        msg, _ = ber.read_ldap_message(req)
+        responses = self.handler.handle_message(msg)
+        all_parsed = []
+        for r in responses:
+            all_parsed.extend(_parse_response(r))
+        entries = [p for p in all_parsed if p["op_tag"] == 4]
+        assert len(entries) == 1
 
     def test_search_one_level_at_base_returns_entries(self):
         req = _build_search_request(13, base_dn="dc=contacts,dc=local", scope=1)
