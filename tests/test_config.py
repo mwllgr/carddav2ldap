@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from carddav_to_ldap.config import Account, CardDAVConfig, Config, LDAPServerConfig, DEFAULT_ATTRIBUTE_MAPPING
+from carddav2ldap.config import Account, CardDAVConfig, Config, LDAPServerConfig, DEFAULT_ATTRIBUTE_MAPPING
 
 
 class TestCardDAVConfig:

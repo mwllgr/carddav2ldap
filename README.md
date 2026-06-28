@@ -1,4 +1,4 @@
-# carddav-to-ldap
+# carddav2ldap
 
 Bridge that fetches contacts from a CardDAV server and serves them over LDAP. Useful for IP phones and other devices that support LDAP phonebook lookup but not CardDAV.
 
@@ -28,7 +28,7 @@ pip install .
 ### With a config file
 
 ```bash
-carddav-to-ldap config.yaml
+carddav2ldap config.yaml
 ```
 
 See [config.example.yaml](config.example.yaml) for all options.
@@ -41,13 +41,13 @@ export C2L_ACCOUNT_1_BIND_PASSWORD=secret
 export C2L_ACCOUNT_1_CARDDAV_URL=https://dav.example.com/addressbooks/user/contacts/
 export C2L_ACCOUNT_1_CARDDAV_USERNAME=user@example.com
 export C2L_ACCOUNT_1_CARDDAV_PASSWORD=secret
-carddav-to-ldap
+carddav2ldap
 ```
 
 ### With Docker
 
 ```bash
-docker build -t carddav-to-ldap .
+docker build -t carddav2ldap .
 
 docker run -p 389:389 \
   -e C2L_ACCOUNT_1_BIND_DN=cn=phone,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at \
@@ -55,7 +55,7 @@ docker run -p 389:389 \
   -e C2L_ACCOUNT_1_CARDDAV_URL=https://dav.example.com/addressbooks/user/contacts/ \
   -e C2L_ACCOUNT_1_CARDDAV_USERNAME=user@example.com \
   -e C2L_ACCOUNT_1_CARDDAV_PASSWORD=secret \
-  carddav-to-ldap
+  carddav2ldap
 ```
 
 Or use the example Compose file:
@@ -76,7 +76,7 @@ export C2L_ACCOUNT_1_BIND_PASSWORD=secret
 export C2L_ACCOUNT_1_CARDDAV_URL=https://cloud.example.com/remote.php/dav/addressbooks/users/alice/contacts/
 export C2L_ACCOUNT_1_CARDDAV_USERNAME=alice
 export C2L_ACCOUNT_1_CARDDAV_PASSWORD=my-app-password
-carddav-to-ldap
+carddav2ldap
 ```
 
 Or with a config file:
@@ -96,7 +96,7 @@ accounts:
 ### Verbose logging
 
 ```bash
-carddav-to-ldap -v config.yaml
+carddav2ldap -v config.yaml
 ```
 
 ## Configuration
@@ -283,7 +283,7 @@ carddav:
 This produces a User-Agent like:
 
 ```
-carddav-to-ldap.mwllgr.at/0.4.0 (192.168.1.4:82842 - cn=phone1,ou=Users,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at)
+carddav2ldap.mwllgr.at/0.4.0 (192.168.1.4:82842 - cn=phone1,ou=Users,ou=Users,dc=carddav2ldap,dc=mwllgr,dc=at)
 ```
 
 Enabled by default. Only applies to real-time searches — cached/background refreshes always use the plain User-Agent. Set `forward_requester: false` to disable.
@@ -293,7 +293,7 @@ Enabled by default. Only applies to real-time searches — cached/background ref
 By default, the CardDAV client uses HTTP/2 (with HTTP/1.1 fallback). HTTP/3 (QUIC) can be enabled for lower latency connections, but requires an additional dependency:
 
 ```bash
-pip install carddav-to-ldap[http3]
+pip install carddav2ldap[http3]
 ```
 
 Then enable it as a shared default or per account:

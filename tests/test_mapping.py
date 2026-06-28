@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import vobject
 
-from carddav_to_ldap.config import DEFAULT_ATTRIBUTE_MAPPING
-from carddav_to_ldap.mapping import vcard_to_ldap_entry, _get_vcard_value, _escape_dn_value
+from carddav2ldap.config import DEFAULT_ATTRIBUTE_MAPPING
+from carddav2ldap.mapping import vcard_to_ldap_entry, _get_vcard_value, _escape_dn_value
 
 
 class TestGetVcardValue:

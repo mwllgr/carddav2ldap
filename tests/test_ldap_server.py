@@ -6,9 +6,9 @@ from typing import Any
 
 import pytest
 
-from carddav_to_ldap import ber
-from carddav_to_ldap.ber import BERElement, TagClass, encode_element, encode_sequence, encode_integer, encode_string
-from carddav_to_ldap.ldap_server import (
+from carddav2ldap import ber
+from carddav2ldap.ber import BERElement, TagClass, encode_element, encode_sequence, encode_integer, encode_string
+from carddav2ldap.ldap_server import (
     HandlerAccount,
     LDAPRequestHandler,
     LDAPServer,

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from carddav_to_ldap.ber import (
+from carddav2ldap.ber import (
     BERElement,
     TagClass,
     decode_element,

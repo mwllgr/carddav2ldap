@@ -1,5 +1,5 @@
 services:
-  carddav-to-ldap:
+  carddav2ldap:
     build: .
     ports:
       - "389:389"

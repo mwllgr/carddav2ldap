@@ -5,12 +5,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from carddav_to_ldap.carddav import (
+from carddav2ldap.carddav import (
     _build_client, _discover_vcards, _fetch_vcards, fetch_contacts,
     build_carddav_filter, search_contacts, _user_agent_for_requester, USER_AGENT,
 )
-from carddav_to_ldap.ldap_server import RequesterInfo
-from carddav_to_ldap.config import CardDAVConfig
+from carddav2ldap.ldap_server import RequesterInfo
+from carddav2ldap.config import CardDAVConfig
 
 
 PROPFIND_RESPONSE = """\
@@ -110,7 +110,7 @@ class TestBuildClient:
     def test_user_agent(self):
         cfg = CardDAVConfig(url="https://x.com/")
         client = _build_client(cfg)
-        assert "carddav-to-ldap.mwllgr.at/" in client.headers["user-agent"]
+        assert "carddav2ldap.mwllgr.at/" in client.headers["user-agent"]
 
     def test_ca_cert(self, tls_certs):
         cfg = CardDAVConfig(url="https://x.com/", ca_cert=tls_certs["ca_cert"])
@@ -177,9 +177,9 @@ class TestFetchVcards:
 
 
 class TestFetchContacts:
-    @patch("carddav_to_ldap.carddav._fetch_vcards")
-    @patch("carddav_to_ldap.carddav._discover_vcards")
-    @patch("carddav_to_ldap.carddav._build_client")
+    @patch("carddav2ldap.carddav._fetch_vcards")
+    @patch("carddav2ldap.carddav._discover_vcards")
+    @patch("carddav2ldap.carddav._build_client")
     def test_integration(self, mock_build, mock_discover, mock_fetch):
         mock_client = MagicMock()
         mock_build.return_value = mock_client
@@ -232,7 +232,7 @@ class TestBuildCardDAVFilter:
 
 
 class TestSearchContacts:
-    @patch("carddav_to_ldap.carddav._build_client")
+    @patch("carddav2ldap.carddav._build_client")
     def test_search_sends_report(self, mock_build):
         mock_client = MagicMock()
         mock_build.return_value = mock_client
@@ -251,7 +251,7 @@ class TestSearchContacts:
         assert "addressbook-query" in body
         assert "prop-filter" in body
 
-    @patch("carddav_to_ldap.carddav._build_client")
+    @patch("carddav2ldap.carddav._build_client")
     def test_search_empty_terms_fetches_all(self, mock_build):
         mock_client = MagicMock()
         mock_build.return_value = mock_client
@@ -268,7 +268,7 @@ class TestSearchContacts:
         body = call_args[1].get("content") or call_args[0][2]
         assert "prop-filter" not in body
 
-    @patch("carddav_to_ldap.carddav._build_client")
+    @patch("carddav2ldap.carddav._build_client")
     def test_search_forwards_requester(self, mock_build):
         mock_client = MagicMock()
         mock_build.return_value = mock_client
@@ -285,7 +285,7 @@ class TestSearchContacts:
         headers = call_args[1].get("headers", {})
         assert headers["User-Agent"] == f"{USER_AGENT} (192.168.1.4:82842 - cn=user1)"
 
-    @patch("carddav_to_ldap.carddav._build_client")
+    @patch("carddav2ldap.carddav._build_client")
     def test_search_no_forward_without_config(self, mock_build):
         mock_client = MagicMock()
         mock_build.return_value = mock_client

@@ -12,7 +12,7 @@ from .config import Account, CardDAVConfig, Config
 from .ldap_server import HandlerAccount, LDAPRequestHandler, LDAPServer, create_ssl_context
 from .mapping import vcard_to_ldap_entry
 
-logger = logging.getLogger("carddav_to_ldap")
+logger = logging.getLogger("carddav2ldap")
 
 
 def _build_entries(carddav: CardDAVConfig, mapping: dict, base_dn: str) -> list[dict]:
@@ -87,7 +87,7 @@ async def _run(cfg: Config) -> None:
             except ImportError:
                 raise SystemExit(
                     "HTTP/3 support requires curl_cffi. "
-                    "Install it with: pip install carddav-to-ldap[http3]"
+                    "Install it with: pip install carddav2ldap[http3]"
                 )
             break
 

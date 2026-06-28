@@ -11,10 +11,10 @@ import vobject
 from .config import CardDAVConfig
 
 try:
-    _VERSION = version("carddav-to-ldap")
+    _VERSION = version("carddav2ldap")
 except PackageNotFoundError:
     _VERSION = "unknown"
-USER_AGENT = f"carddav-to-ldap.mwllgr.at/{_VERSION}"
+USER_AGENT = f"carddav2ldap.mwllgr.at/{_VERSION}"
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,7 @@ def _build_http3_client(cfg: CardDAVConfig, auth: tuple[str, str] | None) -> _Cu
     except ImportError:
         raise ImportError(
             "HTTP/3 support requires curl_cffi. "
-            "Install it with: pip install carddav-to-ldap[http3]"
+            "Install it with: pip install carddav2ldap[http3]"
         )
 
     session = Session(http_version=3)
