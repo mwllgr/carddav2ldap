@@ -120,7 +120,8 @@ def encode_integer(value: int) -> BERElement:
 
 
 def decode_integer(el: BERElement) -> int:
-    assert isinstance(el.value, bytes)
+    if not isinstance(el.value, bytes):
+        raise ValueError("Expected primitive BER element for integer")
     return int.from_bytes(el.value, "big", signed=True)
 
 
@@ -129,8 +130,9 @@ def encode_string(value: str) -> BERElement:
 
 
 def decode_string(el: BERElement) -> str:
-    assert isinstance(el.value, bytes)
-    return el.value.decode("utf-8")
+    if not isinstance(el.value, bytes):
+        raise ValueError("Expected primitive BER element for string")
+    return el.value.decode("utf-8", errors="replace")
 
 
 def encode_boolean(value: bool) -> BERElement:
@@ -138,7 +140,8 @@ def encode_boolean(value: bool) -> BERElement:
 
 
 def decode_boolean(el: BERElement) -> bool:
-    assert isinstance(el.value, bytes)
+    if not isinstance(el.value, bytes):
+        raise ValueError("Expected primitive BER element for boolean")
     return el.value != b"\x00"
 
 
@@ -151,7 +154,8 @@ def encode_enumerated(value: int) -> BERElement:
 
 
 def decode_enumerated(el: BERElement) -> int:
-    assert isinstance(el.value, bytes)
+    if not isinstance(el.value, bytes):
+        raise ValueError("Expected primitive BER element for enumerated")
     return int.from_bytes(el.value, "big", signed=True)
 
 

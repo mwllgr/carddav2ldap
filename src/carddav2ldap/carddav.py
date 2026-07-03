@@ -133,7 +133,7 @@ def _fetch_vcards(client: httpx.Client, url: str, hrefs: list[str]) -> list[vobj
     if not hrefs:
         return []
 
-    href_xml = "\n".join(f'  <d:href>{h}</d:href>' for h in hrefs)
+    href_xml = "\n".join(f'  <d:href>{_xml_escape(h)}</d:href>' for h in hrefs)
     body = ADDRESSBOOK_MULTIGET_BODY.format(hrefs=href_xml)
 
     resp = client.request("REPORT", url, content=body, headers={

@@ -2,7 +2,7 @@
 
 Bridge that fetches contacts from a CardDAV server and serves them over LDAP. Useful for IP phones and other devices that support LDAP phonebook lookup but not CardDAV.
 
-> **Disclaimer:** This project was developed extensively with the help of AI (Claude). The code has not undergone a thorough security review. Use at your own risk, especially in production or security-sensitive environments.
+> **Note:** This project was developed extensively with the help of AI (Claude) and has undergone a security audit. It is intended for use in trusted network environments (e.g., a local LAN serving IP phones). The built-in LDAP server is read-only and has no write operations.
 
 ## Features
 
@@ -160,9 +160,9 @@ Per-account CardDAV settings default to the values from the [CardDAV defaults](#
 
 | Env var | Default | Description |
 |---|---|---|
-| `C2L_PUID` | `1006` | UID of the unprivileged user inside the container |
+| `C2L_PUID` | `1006` | UID of the unprivileged user inside the container (must be a non-zero positive integer) |
 
-The container runs rootless by default. The entrypoint creates a user with the given `C2L_PUID` and drops privileges before starting the application. Override it to match a host UID if you need access to bind-mounted files (e.g. TLS certificates).
+The container runs rootless by default. The entrypoint creates a user with the given `C2L_PUID` and drops privileges before starting the application. Override it to match a host UID if you need access to bind-mounted files (e.g. TLS certificates). Setting `C2L_PUID=0` is rejected to prevent accidental root execution.
 
 ### Attribute mapping
 
@@ -347,6 +347,20 @@ Successfully tested with the following devices:
 - [Snom D785](DEVICES.md#snom-d785)
 
 See [DEVICES.md](DEVICES.md) for configuration screenshots and setup instructions.
+
+## Security
+
+The LDAP server enforces the following limits to mitigate abuse:
+
+| Limit | Value |
+|---|---|
+| Max simultaneous connections per client IP | 20 |
+| Idle read timeout | 60 seconds |
+| Max receive buffer per connection | 1 MB |
+| Max consecutive failed bind attempts before closing | 5 |
+| Delay after each failed bind | 0.5 seconds |
+
+These values are not currently configurable. If you are deploying behind a load balancer or NAT (where all traffic shares a single source IP), the per-IP connection limit may need to be taken into account.
 
 ## Development
 

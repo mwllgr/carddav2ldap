@@ -253,7 +253,9 @@ def _escape_dn_value(val: str) -> str:
     special = {',', '+', '"', '\\', '<', '>', ';', '#', '='}
     result = []
     for i, c in enumerate(val):
-        if c in special or (i == 0 and c == ' ') or (i == len(val) - 1 and c == ' '):
+        if c == '\x00':
+            result.append('\\00')
+        elif c in special or (i == 0 and c == ' ') or (i == len(val) - 1 and c == ' '):
             result.append(f"\\{c}")
         else:
             result.append(c)

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import hmac
 import logging
 import re
 import ssl
@@ -19,6 +20,12 @@ LDAP_OPERATIONS_ERROR = 1
 LDAP_INVALID_CREDENTIALS = 49
 LDAP_NO_SUCH_OBJECT = 32
 LDAP_SIZE_LIMIT_EXCEEDED = 4
+
+_MAX_BUFFER = 1 * 1024 * 1024  # 1 MB per connection
+_READ_TIMEOUT = 60.0  # seconds idle before disconnect
+_MAX_BIND_FAILURES = 5  # close connection after this many failed binds
+_MAX_CONNECTIONS_PER_IP = 20  # simultaneous connections per client IP
+_BIND_FAILURE_DELAY = 0.5  # seconds to sleep after each failed bind
 
 
 def _build_ldap_message(message_id: int, protocol_op: BERElement) -> bytes:
@@ -89,13 +96,14 @@ def _parse_filter(el: BERElement, entry_attrs: dict[str, list[str]]) -> bool:
             return False
 
         if el.tag_number == 7:  # present
-            assert isinstance(el.value, bytes)
-            attr = el.value.decode("utf-8").lower()
+            if not isinstance(el.value, bytes):
+                return False
+            attr = el.value.decode("utf-8", errors="replace").lower()
             if attr == "objectclass":
                 return True
             return attr in entry_attrs
 
-    return True
+    return False
 
 
 def _match_substring(substrings_el: BERElement, values: list[str]) -> bool:
@@ -105,8 +113,9 @@ def _match_substring(substrings_el: BERElement, values: list[str]) -> bool:
     final = ""
 
     for child in children:
-        assert isinstance(child.value, bytes)
-        text = child.value.decode("utf-8").lower()
+        if not isinstance(child.value, bytes):
+            continue
+        text = child.value.decode("utf-8", errors="replace").lower()
         if child.tag_number == 0:  # initial
             initial = text
         elif child.tag_number == 1:  # any
@@ -248,7 +257,8 @@ class LDAPRequestHandler:
         children = op.value if isinstance(op.value, list) else []
         if len(children) >= 3:
             bind_name = ber.decode_string(children[1])
-            assert isinstance(children[2].value, bytes)
+            if not isinstance(children[2].value, bytes):
+                return [_build_bind_response(message_id, LDAP_OPERATIONS_ERROR, message="Malformed bind request")]
             bind_pw = children[2].value.decode("utf-8", errors="replace")
         else:
             bind_name = ""
@@ -259,14 +269,20 @@ class LDAPRequestHandler:
             if not account.bind_dn and not account.bind_password:
                 anonymous_account = account
                 continue
-            if bind_name == account.bind_dn and bind_pw == account.bind_password:
+            if bind_name == account.bind_dn and hmac.compare_digest(
+                bind_pw.encode("utf-8"), account.bind_password.encode("utf-8")
+            ):
                 conn_state["account"] = account
+                conn_state.pop("_bind_failure_count", None)
                 return [_build_bind_response(message_id, LDAP_SUCCESS)]
 
         if anonymous_account is not None and not bind_name and not bind_pw:
             conn_state["account"] = anonymous_account
+            conn_state.pop("_bind_failure_count", None)
             return [_build_bind_response(message_id, LDAP_SUCCESS)]
 
+        conn_state["_bind_failure_count"] = conn_state.get("_bind_failure_count", 0) + 1
+        conn_state["_bind_failed"] = True
         return [_build_bind_response(message_id, LDAP_INVALID_CREDENTIALS, message="Invalid credentials")]
 
     def _handle_search(self, message_id: int, op: BERElement, peer: tuple | None, conn_state: dict) -> list[bytes]:
@@ -350,60 +366,88 @@ class LDAPServer:
         self.plaintext_port = plaintext_port
         self._server: asyncio.AbstractServer | None = None
         self._plaintext_server: asyncio.AbstractServer | None = None
+        self._ip_connections: dict[str, int] = {}
 
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         peer = writer.get_extra_info("peername", ("unknown",))
         logger.info("Client connected from %s", peer)
 
-        if self.allowed_client_cns:
-            ssl_obj = writer.get_extra_info("ssl_object")
-            if ssl_obj is None:
-                logger.warning("mTLS required but no TLS connection from %s", peer)
-                writer.close()
-                await writer.wait_closed()
-                return
-            cert = ssl_obj.getpeercert()
-            if not cert:
-                logger.warning("mTLS required but no client certificate from %s", peer)
-                writer.close()
-                await writer.wait_closed()
-                return
-            cn = _extract_cn(cert)
-            if cn not in self.allowed_client_cns:
-                logger.warning("Client CN '%s' not in allowed list, rejecting %s", cn, peer)
-                writer.close()
-                await writer.wait_closed()
-                return
-            logger.info("Accepted client with CN '%s'", cn)
+        ip = peer[0] if isinstance(peer, tuple) and len(peer) >= 1 else "unknown"
+        if self._ip_connections.get(ip, 0) >= _MAX_CONNECTIONS_PER_IP:
+            logger.warning("Connection limit for %s exceeded, rejecting", ip)
+            writer.close()
+            await writer.wait_closed()
+            return
+        self._ip_connections[ip] = self._ip_connections.get(ip, 0) + 1
 
-        conn_state: dict = {}
-        buf = b""
         try:
-            while True:
-                data = await reader.read(65536)
-                if not data:
-                    break
-                buf += data
+            if self.allowed_client_cns:
+                ssl_obj = writer.get_extra_info("ssl_object")
+                if ssl_obj is None:
+                    logger.warning("mTLS required but no TLS connection from %s", peer)
+                    return
+                cert = ssl_obj.getpeercert()
+                if not cert:
+                    logger.warning("mTLS required but no client certificate from %s", peer)
+                    return
+                cn = _extract_cn(cert)
+                if cn not in self.allowed_client_cns:
+                    logger.warning("Client CN '%s' not in allowed list, rejecting %s", cn, peer)
+                    return
+                logger.info("Accepted client with CN '%s'", cn)
 
-                while buf:
-                    msg, buf = ber.read_ldap_message(buf)
-                    if msg is None:
+            conn_state: dict = {}
+            buf = b""
+            try:
+                while True:
+                    try:
+                        data = await asyncio.wait_for(reader.read(65536), timeout=_READ_TIMEOUT)
+                    except asyncio.TimeoutError:
+                        logger.info("Client %s timed out", peer)
+                        break
+                    if not data:
+                        break
+                    buf += data
+
+                    if len(buf) > _MAX_BUFFER:
+                        logger.warning("Receive buffer limit exceeded for %s, closing", peer)
                         break
 
-                    responses = self.handler.handle_message(msg, peer, conn_state)
-                    if not responses:
-                        writer.close()
-                        await writer.wait_closed()
-                        return
+                    while buf:
+                        msg, buf = ber.read_ldap_message(buf)
+                        if msg is None:
+                            break
 
-                    for resp_data in responses:
-                        writer.write(resp_data)
-                    await writer.drain()
-        except (ConnectionResetError, BrokenPipeError):
-            pass
-        except Exception:
-            logger.exception("Error handling client %s", peer)
+                        responses = self.handler.handle_message(msg, peer, conn_state)
+                        if not responses:
+                            writer.close()
+                            await writer.wait_closed()
+                            return
+
+                        bind_failed = conn_state.pop("_bind_failed", False)
+                        if bind_failed:
+                            await asyncio.sleep(_BIND_FAILURE_DELAY)
+
+                        for resp_data in responses:
+                            writer.write(resp_data)
+                        await writer.drain()
+
+                        if bind_failed and conn_state.get("_bind_failure_count", 0) >= _MAX_BIND_FAILURES:
+                            logger.warning("Too many bind failures from %s, closing", peer)
+                            writer.close()
+                            await writer.wait_closed()
+                            return
+
+            except (ConnectionResetError, BrokenPipeError):
+                pass
+            except Exception:
+                logger.exception("Error handling client %s", peer)
         finally:
+            count = self._ip_connections.get(ip, 1) - 1
+            if count <= 0:
+                self._ip_connections.pop(ip, None)
+            else:
+                self._ip_connections[ip] = count
             try:
                 writer.close()
                 await writer.wait_closed()
