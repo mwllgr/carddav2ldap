@@ -2,7 +2,7 @@
 
 Bridge that fetches contacts from a CardDAV server and serves them over LDAP. Useful for IP phones and other devices that support LDAP phonebook lookup but not CardDAV.
 
-> **Note:** This project was developed extensively with the help of AI (Claude) and has undergone a security audit. It is intended for use in trusted network environments (e.g., a local LAN serving IP phones). The built-in LDAP server is read-only and has no write operations.
+> **Note:** This project was developed extensively with the help of AI (Claude) and has **not** undergone a security audit. It is intended for use in trusted network environments (e.g., a local LAN serving IP phones). The built-in LDAP server is read-only and has no write operations.
 
 ## Features
 
